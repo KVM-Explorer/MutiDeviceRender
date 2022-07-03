@@ -1,10 +1,10 @@
 #pragma	once
 #include "Render.hpp"
 
+
 Render::QueueFamilyIndices Render::queueIndices_ ;
 Render::SwapChainRequiredInfo Render::requiredInfo_;
-uint32_t Render::textureWidth = 256;
-uint32_t Render::textureHeight = 256;
+
 
 vk::Instance Render::instance_ = nullptr;
 vk::SurfaceKHR Render::surface_ = nullptr;
@@ -27,8 +27,7 @@ vk::Semaphore Render::renderFinishSemaphore_ = nullptr;
 vk::Fence Render::fence_ = nullptr;
 vk::Buffer Render::vertexBuffer_ = nullptr;
 vk::DeviceMemory Render::vertexMemory_ = nullptr;
-vk::Image Render::textureImage_ = nullptr;
-vk::DeviceMemory Render::textureMemory_ = nullptr;
+Render::Texture Render::texture_;
 
 struct Vertex {
 	glm::vec2 position;
@@ -157,7 +156,7 @@ void Render::init(GLFWwindow* window)
 	CHECK_NULL(fence_)
 
 	createBuffer();
-	createImage();
+	createTexture();
 }
 
 vk::Instance Render::createInstance(std::vector<const char*>& extensions)
@@ -557,7 +556,7 @@ Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 	return info;
 }
 
-void Render::createImage()
+void Render::createTexture()
 {
 	textureImage_ = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
 	textureMemory_ = allocateMem(textureImage_);
@@ -566,6 +565,9 @@ void Render::createImage()
 	CHECK_NULL(textureMemory_);
 
 	device_.bindImageMemory(textureImage_, textureMemory_,0);
+	
+
+
 
 }
 

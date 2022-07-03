@@ -24,6 +24,8 @@ endif()
 find_program(GLSLC_PROGRAM glslc REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
+find_path(STB_INCLUDE_DIRS "stb.h")
+    
     
 
 file(GLOB_RECURSE TARGET_HEADER *.hpp)
@@ -40,7 +42,8 @@ target_link_libraries(CMakeProject1 PUBLIC	glm::glm
 											SDL2::SDL2
 											glfw) 
 
-target_include_directories(CMakeProject1 PUBLIC ${Vulkan_INCLUDE_DIRS})
+
+target_include_directories(CMakeProject1 PUBLIC ${Vulkan_INCLUDE_DIRS} ${STB_INCLUDE_DIRS})
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET CMakeProject1 PROPERTY CXX_STANDARD 20)

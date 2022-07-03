@@ -9,6 +9,7 @@
 #include <array>
 #include <exception>
 #include <numeric>
+#include <stb_image.h>
 
 #undef max
 
@@ -23,6 +24,9 @@ public:
 	static void waitIdle();
 	
 private:
+	static const uint32_t textureWidth = 256;
+	static const uint32_t textureHeight= 256;
+
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsIndices;
@@ -43,7 +47,18 @@ private:
 		uint32_t index;
 		size_t size;
 	};
-
+	struct Texture
+	{
+		vk::Image image;
+		vk::ImageLayout layout;
+		vk::ImageView imageView;
+		vk::DeviceMemory deviceMem;
+		uint32_t width, height;
+		uint32_t mipLevels;
+		uint32_t layCount;
+		vk::DescriptorImageInfo descriptor;
+		vk::Sampler sampler;
+	};
 	static QueueFamilyIndices queueIndices_;
 	static SwapChainRequiredInfo requiredInfo_;
 
@@ -53,6 +68,7 @@ private:
 	static vk::Device	device_;
 	static vk::Queue	graphicQueue_;
 	static vk::Queue	presentQueue_;
+	static vk::Queue	computeQueue_;
 	static vk::SwapchainKHR swapchain_;
 	static std::vector<vk::Image> images_;
 	static std::vector<vk::ImageView> imageViews_;
@@ -68,10 +84,7 @@ private:
 	static vk::Fence fence_;
 	static vk::Buffer vertexBuffer_;
 	static vk::DeviceMemory vertexMemory_;
-	static vk::Image textureImage_;
-	static vk::DeviceMemory textureMemory_;
-	static uint32_t textureWidth;
-	static uint32_t textureHeight;
+	static Texture texture_;
 	
 
 	static vk::Instance createInstance(std::vector<const char*>& extensions);
@@ -93,7 +106,7 @@ private:
 	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
 	static void createBuffer();
-	static void createImage();
+	static void createTexture();
 	
 
 	static QueueFamilyIndices queryPhysicalDevice();
