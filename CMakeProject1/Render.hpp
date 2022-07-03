@@ -68,6 +68,8 @@ private:
 	static vk::Fence fence_;
 	static vk::Buffer vertexBuffer_;
 	static vk::DeviceMemory vertexMemory_;
+	static vk::Image textureImage_;
+	static vk::DeviceMemory textureMemory_;
 	static uint32_t textureWidth;
 	static uint32_t textureHeight;
 	
@@ -86,10 +88,13 @@ private:
 	static void recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer);
 	static vk::Semaphore createSemaphore();
 	static vk::Fence createFence();
-	static vk::Buffer createBuffer(vk::BufferUsageFlags flag);
+	static vk::Buffer createBufferDefine(vk::BufferUsageFlags flag);
+	static vk::Image createImageDefine(vk::ImageUsageFlags flag);
 	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
-	static vk::Image createTextureImage();
+	static void createBuffer();
+	static void createImage();
+	
 
 	static QueueFamilyIndices queryPhysicalDevice();
 	static SwapChainRequiredInfo querySwapChainRequiredInfo(int w,int h);

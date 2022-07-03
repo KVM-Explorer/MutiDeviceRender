@@ -155,17 +155,8 @@ void Render::init(GLFWwindow* window)
 	fence_ = createFence();
 	CHECK_NULL(fence_)
 
-	vertexBuffer_ = createBuffer(vk::BufferUsageFlagBits::eVertexBuffer);
-	vertexMemory_ = allocateMem(vertexBuffer_);
-
-	CHECK_NULL(vertexBuffer_)
-	CHECK_NULL(vertexMemory_)
-
-	device_.bindBufferMemory(vertexBuffer_,vertexMemory_, 0);
-
-	void* data = device_.mapMemory(vertexMemory_, 0, sizeof(vertices));
-	memcpy(data, vertices.data(), sizeof(vertices));
-	device_.unmapMemory(vertexMemory_);
+	createBuffer();
+	createImage();
 }
 
 vk::Instance Render::createInstance(std::vector<const char*>& extensions)
@@ -422,7 +413,7 @@ vk::Fence Render::createFence()
 	return device_.createFence(info);
 }
 
-vk::Buffer Render::createBuffer(vk::BufferUsageFlags flag)
+vk::Buffer Render::createBufferDefine(vk::BufferUsageFlags flag)
 {
 	vk::BufferCreateInfo info;
 	info.setSharingMode(vk::SharingMode::eExclusive)
@@ -513,6 +504,21 @@ Render::QueueFamilyIndices Render::queryPhysicalDevice()
 	return indices;
 }
 
+void Render::createBuffer()
+{
+	vertexBuffer_ = createBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer);
+	vertexMemory_ = allocateMem(vertexBuffer_);
+
+	CHECK_NULL(vertexBuffer_)
+	CHECK_NULL(vertexMemory_)
+
+	device_.bindBufferMemory(vertexBuffer_, vertexMemory_, 0);
+
+	void* data = device_.mapMemory(vertexMemory_, 0, sizeof(vertices));
+	memcpy(data, vertices.data(), sizeof(vertices));
+	device_.unmapMemory(vertexMemory_);
+}
+
 Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 {
 	SwapChainRequiredInfo info;
@@ -547,6 +553,18 @@ Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 	}
 
 	return info;
+}
+
+void Render::createImage()
+{
+	textureImage_ = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
+	textureMemory_ = allocateMem(textureImage_);
+
+	CHECK_NULL(textureImage_);
+	CHECK_NULL(textureMemory_);
+
+	device_.bindImageMemory(textureImage_, textureMemory_,0);
+
 }
 
 Render::MemRequiredInfo Render::queryImageMemRequiredInfo(vk::Image image, vk::MemoryPropertyFlags flag)
@@ -589,8 +607,12 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 void Render::quit()
 {
 	// TODO 按顺序释放成员
+	device_.freeMemory(textureMemory_);
+	device_.destroyImage(textureImage_);
+
 	device_.freeMemory(vertexMemory_);
 	device_.destroyBuffer(vertexBuffer_);
+
 	device_.destroyFence(fence_);
 	device_.destroySemaphore(imageAvaliableSemaphore_);
 	device_.destroySemaphore(renderFinishSemaphore_);
@@ -720,7 +742,7 @@ vk::ShaderModule Render::createShaderModule(const char* filename)
 	return shaderModules_.back();
 }
 
-vk::Image Render::createTextureImage()
+vk::Image Render::createImageDefine(vk::ImageUsageFlags flag)
 {
 	vk::Image texture;
 	vk::ImageCreateInfo info;
@@ -736,7 +758,7 @@ vk::Image Render::createTextureImage()
 		.setArrayLayers(1)
 		.setFormat(vk::Format::eR8G8B8A8Srgb)
 		.setSharingMode(vk::SharingMode::eExclusive)
-		.setUsage(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
+		.setUsage(flag);
 
 	return device_.createImage(info);
 }
