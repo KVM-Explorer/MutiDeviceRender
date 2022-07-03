@@ -27,7 +27,8 @@ vk::Semaphore Render::renderFinishSemaphore_ = nullptr;
 vk::Fence Render::fence_ = nullptr;
 vk::Buffer Render::vertexBuffer_ = nullptr;
 vk::DeviceMemory Render::vertexMemory_ = nullptr;
-
+vk::Image Render::textureImage_ = nullptr;
+vk::DeviceMemory Render::textureMemory_ = nullptr;
 
 struct Vertex {
 	glm::vec2 position;
@@ -426,7 +427,8 @@ vk::Buffer Render::createBufferDefine(vk::BufferUsageFlags flag)
 
 vk::DeviceMemory Render::allocateMem(vk::Buffer buffer)
 {
-	auto requirement = queryBufferMemRequiredInfo(buffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+	auto requirement = queryBufferMemRequiredInfo(buffer, 
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
 	vk::MemoryAllocateInfo info;
 	info.setAllocationSize(requirement.size)
@@ -570,15 +572,14 @@ void Render::createImage()
 Render::MemRequiredInfo Render::queryImageMemRequiredInfo(vk::Image image, vk::MemoryPropertyFlags flag)
 {
 	MemRequiredInfo info;
-	
 	auto properties = physicalDevice_.getMemoryProperties();
 	auto requirement = device_.getImageMemoryRequirements(image);
 	info.size = requirement.size;
-
+	info.index = 0;
 	for (int i = 0; i < properties.memoryTypeCount; i++)
 	{
 		if ((requirement.memoryTypeBits & (1 << i)) &&
-			properties.memoryTypes[i].propertyFlags & (flag))
+			(properties.memoryTypes[i].propertyFlags & (flag)))
 		{
 			info.index = i;
 		}
@@ -596,7 +597,7 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 	for(int i=0;i<properties.memoryTypeCount;i++)
 	{
 		if((requirement.memoryTypeBits&(1<<i))&&
-			properties.memoryTypes[i].propertyFlags & (flag))
+			(properties.memoryTypes[i].propertyFlags & (flag)))
 		{
 			info.index = i;
 		}
@@ -758,7 +759,10 @@ vk::Image Render::createImageDefine(vk::ImageUsageFlags flag)
 		.setArrayLayers(1)
 		.setFormat(vk::Format::eR8G8B8A8Srgb)
 		.setSharingMode(vk::SharingMode::eExclusive)
+		.setTiling(vk::ImageTiling::eOptimal)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setUsage(flag);
+		
 
 	return device_.createImage(info);
 }
@@ -766,7 +770,8 @@ vk::Image Render::createImageDefine(vk::ImageUsageFlags flag)
 vk::DeviceMemory Render::allocateMem(vk::Image image)
 {
 	
-	auto requirement = queryImageMemRequiredInfo(image, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+	auto requirement = queryImageMemRequiredInfo(image, 
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
 	vk::MemoryAllocateInfo info;
 	info.setAllocationSize(requirement.size)
