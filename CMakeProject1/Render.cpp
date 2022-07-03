@@ -156,7 +156,7 @@ void Render::init(GLFWwindow* window)
 	CHECK_NULL(fence_)
 
 	createBuffer();
-	createTexture();
+	//createTexture();
 }
 
 vk::Instance Render::createInstance(std::vector<const char*>& extensions)
@@ -413,7 +413,7 @@ vk::Fence Render::createFence()
 	return device_.createFence(info);
 }
 
-vk::Buffer Render::createBufferDefine(vk::BufferUsageFlags flag)
+vk::Buffer Render::createVertexBufferDefine(vk::BufferUsageFlags flag)
 {
 	vk::BufferCreateInfo info;
 	info.setSharingMode(vk::SharingMode::eExclusive)
@@ -507,7 +507,7 @@ Render::QueueFamilyIndices Render::queryPhysicalDevice()
 
 void Render::createBuffer()
 {
-	vertexBuffer_ = createBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer);
+	vertexBuffer_ = createVertexBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer);
 	vertexMemory_ = allocateMem(vertexBuffer_);
 
 	CHECK_NULL(vertexBuffer_)
@@ -556,20 +556,146 @@ Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 	return info;
 }
 
-void Render::createTexture()
+void Render::createTexture(std::string filename)
 {
-	textureImage_ = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
-	textureMemory_ = allocateMem(textureImage_);
-
-	CHECK_NULL(textureImage_);
-	CHECK_NULL(textureMemory_);
-
-	device_.bindImageMemory(textureImage_, textureMemory_,0);
+	texture_.image = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
+	texture_.memory = allocateMem(texture_.image);
 	
+	CHECK_NULL(texture_.image);
+	CHECK_NULL(texture_.memory);
+	
+	device_.bindImageMemory(texture_.image, texture_.memory,0);
+	
+	
+	vk::CommandBuffer layout_cmd = createCommandBuffer();
+
+	vk::CommandBufferBeginInfo begin_info;
+	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	
+	if (layout_cmd.begin(&begin_info) != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("command buffer record failed");
+	}
+	texture_.layout = vk::ImageLayout::eGeneral;
+	setImageLayout(layout_cmd,texture_.image,vk::ImageAspectFlagBits::eColor,
+		vk::ImageLayout::eUndefined,
+		texture_.layout);
+	
+	flushCommandBuffer(layout_cmd);
 
 
+
+	// sampler
+	texture_.sampler = createTextureSampler();
+	// image view
+	texture_.imageView = createTextureViewImage(texture_.image);
+
+	texture_.descriptor.setImageLayout(texture_.layout);
+	texture_.descriptor.setImageView(texture_.imageView);
+	texture_.descriptor.setSampler(texture_.sampler);
 
 }
+
+vk::Sampler Render::createTextureSampler()
+{
+	vk::SamplerCreateInfo info;
+	info.setMagFilter(vk::Filter::eLinear)
+		.setMinFilter(vk::Filter::eLinear)
+		.setMipmapMode(vk::SamplerMipmapMode::eLinear)
+		.setAddressModeU(vk::SamplerAddressMode::eClampToBorder)
+		.setAddressModeV(vk::SamplerAddressMode::eClampToBorder)
+		.setAddressModeW(vk::SamplerAddressMode::eClampToBorder)
+		.setMinLod(0)
+		.setMaxAnisotropy(1.f)
+		.setCompareOp(vk::CompareOp::eNever)
+		.setMinLod(0)
+		.setMaxLod(0)
+		.setBorderColor(vk::BorderColor::eFloatOpaqueWhite);
+
+	return device_.createSampler(info);
+}
+
+vk::ImageView Render::createTextureViewImage(vk::Image image)
+{
+	vk::ImageViewCreateInfo info;
+	info.setImage(image)
+		.setFormat(requiredInfo_.format.format)
+		.setViewType(vk::ImageViewType::e2D);
+	vk::ImageSubresourceRange range;
+	range.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setLayerCount(1)
+		.setBaseArrayLayer(0)
+		.setAspectMask(vk::ImageAspectFlagBits::eColor);
+	info.setSubresourceRange(range);
+	vk::ComponentMapping mapping;
+	info.setComponents(mapping);
+
+	return device_.createImageView(info);
+}
+
+void Render::setImageLayout(vk::CommandBuffer cmd_buffer, vk::Image image,
+	vk::ImageAspectFlags flags, vk::ImageLayout old_layout, vk::ImageLayout new_layout)
+{
+	auto stage_mask = vk::PipelineStageFlagBits::eAllCommands;
+	vk::ImageSubresourceRange subsource_range{};
+	subsource_range.setAspectMask(flags)
+		.setBaseMipLevel(0)
+		.setLevelCount(1)
+		.setLayerCount(1);
+
+	// TODO set image layput
+	auto image_memory_barrier = createImageMemoryBarrier();
+	image_memory_barrier.setOldLayout(old_layout);
+	image_memory_barrier.setNewLayout(new_layout);
+	image_memory_barrier.setImage(image);
+	image_memory_barrier.setSubresourceRange(subsource_range);
+
+	image_memory_barrier.setSrcAccessMask(vk::AccessFlagBits::eNone);
+
+	//TODO update dependency Flag
+	cmd_buffer.pipelineBarrier(stage_mask,stage_mask ,vk::DependencyFlagBits::eByRegion,
+		0,nullptr,0,nullptr,1,&image_memory_barrier);
+	return;
+}
+
+vk::ImageMemoryBarrier Render::createImageMemoryBarrier()
+{
+	vk::ImageMemoryBarrier image_memory_barrier;
+	image_memory_barrier.setSrcQueueFamilyIndex(queueIndices_.graphicsIndices.value());
+	image_memory_barrier.setDstQueueFamilyIndex(queueIndices_.graphicsIndices.value());
+	return image_memory_barrier;
+}
+
+void Render::flushCommandBuffer(vk::CommandBuffer cmd_buffer)
+{
+	cmd_buffer.end();
+
+	// TODO 
+
+	vk::SubmitInfo submit_info;
+	submit_info.setCommandBufferCount(1)
+		.setPCommandBuffers(&cmd_buffer);
+
+	vk::FenceCreateInfo fence_info;
+	vk::Fence fence = device_.createFence(fence_info);
+	CHECK_NULL(fence)
+
+	vk::Result result = graphicQueue_.submit(1,&submit_info, fence);
+	
+	//if (result.result != vk::Result::eSuccess) {
+	//	throw std::runtime_error("faied to commit command in texture");
+	//}
+	device_.waitForFences(fence, VK_TRUE, 100000000000);
+	//if (result.result != vk::Result::eSuccess)
+	//{
+	//	throw std::runtime_error("failed to wait texture fence");
+	//}
+	device_.destroyFence(fence);
+	device_.freeCommandBuffers(commandPool_,cmd_buffer);
+	return;
+}
+
 
 Render::MemRequiredInfo Render::queryImageMemRequiredInfo(vk::Image image, vk::MemoryPropertyFlags flag)
 {
@@ -610,8 +736,9 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 void Render::quit()
 {
 	// TODO 按顺序释放成员
-	device_.freeMemory(textureMemory_);
-	device_.destroyImage(textureImage_);
+
+	device_.freeMemory(texture_.memory);
+	device_.destroyImage(texture_.image);
 
 	device_.freeMemory(vertexMemory_);
 	device_.destroyBuffer(vertexBuffer_);

@@ -9,7 +9,7 @@
 #include <array>
 #include <exception>
 #include <numeric>
-#include <stb_image.h>
+
 
 #undef max
 
@@ -47,18 +47,16 @@ private:
 		uint32_t index;
 		size_t size;
 	};
-	struct Texture
-	{
+
+	struct Texture {
 		vk::Image image;
+		vk::DeviceMemory memory;
 		vk::ImageLayout layout;
-		vk::ImageView imageView;
-		vk::DeviceMemory deviceMem;
-		uint32_t width, height;
-		uint32_t mipLevels;
-		uint32_t layCount;
-		vk::DescriptorImageInfo descriptor;
 		vk::Sampler sampler;
+		vk::ImageView imageView;
+		vk::DescriptorImageInfo descriptor;
 	};
+	
 	static QueueFamilyIndices queueIndices_;
 	static SwapChainRequiredInfo requiredInfo_;
 
@@ -101,12 +99,18 @@ private:
 	static void recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer);
 	static vk::Semaphore createSemaphore();
 	static vk::Fence createFence();
-	static vk::Buffer createBufferDefine(vk::BufferUsageFlags flag);
+	static vk::Buffer createVertexBufferDefine(vk::BufferUsageFlags flag);
 	static vk::Image createImageDefine(vk::ImageUsageFlags flag);
 	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
 	static void createBuffer();
-	static void createTexture();
+	static void createTexture(std::string filename);
+	static vk::Sampler createTextureSampler();
+	static vk::ImageView createTextureViewImage(vk::Image);
+	static void  setImageLayout(vk::CommandBuffer cmd_buffer,vk::Image image,
+		vk::ImageAspectFlags flags, vk::ImageLayout old_layout,vk::ImageLayout new_layout);
+	static vk::ImageMemoryBarrier createImageMemoryBarrier();
+	static void flushCommandBuffer(vk::CommandBuffer cmd_buffer);
 	
 
 	static QueueFamilyIndices queryPhysicalDevice();
