@@ -1,0 +1,276 @@
+﻿#version 460 core
+
+layout (local_size_x = 1,local_size_y = 1) in;
+layout(rgba32f,binding=0) uniform image2D img_output;
+
+// TODO Define Init Constant
+const int imageWidth = 512;
+const int imageHeight = 256;
+const float INF = 0x7fffffff ;
+const float focalLength = 1.0f;
+const int maxDepth = 30;
+const int maxObjectNum = 4;
+const int samplesNum = 100;
+
+struct Ray
+{
+    vec3 pos;
+    vec3 direction;
+};
+
+struct Sphere
+{
+    vec3 center;
+    float radius;
+    vec3 matrial;
+};
+
+struct HitRecord
+{
+    bool ishit;
+    vec3 p;
+    vec3 norm;
+    float t;
+    vec3 matrial;
+};
+
+Sphere objects[maxObjectNum];
+
+float rand(float);
+float rand();
+vec3 randomVector(vec3 pos);
+vec3 randomInUint(vec3 p);
+
+void initObjects();
+Ray rayInit(vec3 pos,vec3 d);
+vec3 rayFaceNormal(Ray r,vec3 normal);
+vec3 rayAt(Ray ray,float t);
+HitRecord hitSphere(Sphere sphere,float min_t,float max_t,Ray r);
+HitRecord hitObjects(Ray ray,float min_t,float max_t);
+vec3 rayColor(Ray ray,int depth);
+vec3 rayReflect(vec3 v,vec3 n);
+
+vec3 gamma2(vec3 color);
+vec3 multiSmaples(vec3 color,int num);
+
+
+
+void main()
+{
+    // image
+    const float aspect_ratio = 512.0 / 256.0;
+    const int image_width = imageWidth;
+    const int image_height = int(image_width / aspect_ratio);
+ 
+    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dims = imageSize(img_output);
+
+    float scale_x = pixel_coords.x / float(dims.x);
+    float scale_y = pixel_coords.y / float(dims.y);
+
+    // Camera
+
+    float viewport_height = 2;
+    float viewport_width = aspect_ratio *viewport_height;
+    vec3 origin = vec3(0, 0, 0);
+    vec3 horizontal = vec3(viewport_width,0,0);
+    vec3 veritical  = vec3(0,viewport_height,0);
+
+    vec3 lower_left_cornor = origin - horizontal /2 - veritical/2 - vec3(0,0,focalLength);
+    vec3 pos = lower_left_cornor+scale_x*horizontal+scale_y*veritical-origin;   
+    
+    vec3 color = vec3(0,0,0);
+    initObjects();
+    
+    for (int i=0;i<samplesNum;i++)
+    {
+    
+        vec3 tmp_rand = randomVector(vec3(pos.x,pos.y,i));
+
+        float sx = (pixel_coords.x + tmp_rand.x) /float(dims.x);
+        float sy = (pixel_coords.y + tmp_rand.y) /float(dims.y);
+        vec3 tmp_direct = lower_left_cornor+ sx*horizontal+sy*veritical - origin;
+
+        Ray r = rayInit(origin, tmp_direct);
+        color += rayColor(r,maxDepth);
+    }
+    //multi-Samples
+    color = multiSmaples(color,samplesNum);
+    // Gmma-2
+    color = gamma2(color);
+    vec4 pixel = vec4(color,1.f);
+    
+    imageStore(img_output, pixel_coords, pixel);
+    
+}
+
+// range: 0-1
+float rand(float x)
+{
+    float y = fract(sin(x)*100000.0);
+    return y;
+}
+
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// every dimension range -1,1 
+vec3 randomVector(vec3 p)
+{
+    p = vec3( dot(p,vec3(127.1,311.7, 74.7)),
+              dot(p,vec3(269.5,183.3,246.1)),
+              dot(p,vec3(113.5,271.9,124.6)));
+
+    return -1.0 + 2.0*fract(sin(p)*43758.5453123);
+}
+
+vec3 randomInUint(vec3 p)
+{
+    //TODO 实现控制其length<1
+    return randomVector(p);
+}
+
+void initObjects()
+{
+    objects[0].center=vec3(0,0,-1.f);
+    objects[0].radius = 0.5f;
+    objects[0].matrial = vec3(0.8,0.8,0.8);
+
+    objects[1].center = vec3(0,-100.5,-1);
+    objects[1].radius = 100.f;
+    objects[1].matrial = vec3(0.7,0.7,0.3);
+
+    // objects[2].center = vec3(-1,0,-1);
+    // objects[2].radius = 0.5f;
+    // objects[2].matrial = vec3(0.8,0.8,0.8);
+
+
+    // objects[3].center = vec3(1,0,-1);
+    // objects[3].radius = 0.5f;
+    // objects[3].matrial = vec3(0.8,0.6,0.2);
+}
+
+Ray rayInit(vec3 pos,vec3 d)
+{
+    Ray ray;
+    ray.pos = pos;
+    ray.direction = d;
+    return ray;
+}
+
+vec3 rayAt(Ray ray,float t)
+{
+    return ray.pos + t * ray.direction;
+}
+
+vec3 rayFaceNormal(Ray r,vec3 normal)
+{
+    float front = dot(r.direction,normal);
+    if(front<0) return normal;
+    return -normal;
+}
+
+HitRecord hitSphere(Sphere sphere,float min_t,float max_t,Ray r)
+{
+    HitRecord hit_record;
+    hit_record.ishit = false;
+    vec3 oc = r.pos - sphere.center;
+    float a = dot(r.direction, r.direction);
+    float half_b = dot(oc,r.direction);
+    float c = dot(oc, oc) - sphere.radius*sphere.radius;
+    float discriminant = half_b*half_b - a*c;
+    
+    if(discriminant<0){
+        return hit_record;
+    }
+    
+    float sqrtd = sqrt(discriminant);
+    float root = (-half_b-sqrtd)/a;
+
+    
+    if(root<min_t || root>max_t){
+        root = (-half_b+sqrtd)/a;
+        if(root<min_t || root>max_t){
+            return hit_record;
+         }
+    }
+    hit_record.ishit = true;
+    hit_record.t = root;
+    hit_record.p = rayAt(r,root);
+    vec3 normal = (hit_record.p-sphere.center)/sphere.radius;
+    hit_record.norm = rayFaceNormal(r,normal);
+    hit_record.matrial = sphere.matrial;
+    return hit_record;
+    
+}
+
+HitRecord hitObjects(Ray ray,float min_t,float max_t)
+{
+    HitRecord hit_record;
+    hit_record.ishit = false;
+    float closest_hit  = max_t;
+    //TODO
+    for(int i=0;i<maxObjectNum;i++)
+    {
+        HitRecord tmp_record = hitSphere(objects[i],min_t,closest_hit,ray);
+        if(tmp_record.ishit){
+            closest_hit = tmp_record.t;
+            hit_record = tmp_record;
+        }
+    }
+    return hit_record;
+}
+
+vec3 rayColor(Ray ray,int depth)
+{
+    // define var
+    HitRecord hit_record;
+    vec3 matrial[maxDepth];
+    vec3 result = vec3(0,0,0);
+    int range = 0 ;
+        
+    while(range<depth){    
+        
+        //  hit object
+        hit_record = hitObjects(ray,0.001,INF);
+        float t = hit_record.t;
+        if(hit_record.ishit && t > 0 ){
+            vec3 target = hit_record.p+hit_record.norm+randomInUint(hit_record.p);  // right
+            // vec3 target = hit_record.p+hit_record.norm+randomInUint(ray.pos);    // error
+            // vec3 target = hit_record.p+hit_record.norm;                          // refference
+            ray.pos = hit_record.p;
+            ray.direction =target - hit_record.p;
+            matrial[range] = hit_record.matrial;
+            range++;
+            continue;
+        }
+
+        // backgound
+        vec3 unit_direction = normalize(ray.direction);
+        t = 0.5 * (unit_direction.y + 1.0);
+        result = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+        break;
+    }
+    for(int i=0;i<range;i++) {
+        result = result*matrial[i];
+    }
+    return result;
+}
+
+vec3 gamma2(vec3 color)
+{
+    return sqrt(color);
+}
+
+vec3 multiSmaples(vec3 color,int num)
+{
+    float scale = 1.f/float(num);
+    color = color*scale;
+    return clamp(color,vec3(0,0,0),vec3(0.999,0.999,0.999));
+}
+
+vec3 rayReflect(vec3 v,vec3 n)
+{
+    return v-2.f*dot(v,n)*n;
+}
