@@ -446,15 +446,16 @@ void Render::render()
 {
 	// Computer Shader
 	//vk::Result status
-	auto status = device_.waitForFences(1, &computer_.fence, true, 100);
-	if (status != vk::Result::eSuccess) throw std::runtime_error("failed to wait computer shader");
 	device_.resetFences(computer_.fence);
-
 	vk::SubmitInfo computer_submit_info;
 	computer_submit_info.setCommandBuffers(computer_.commandBuffer)
 		.setCommandBufferCount(1);
-	status = computeQueue_.submit(1, &computer_submit_info, computer_.fence);
-	if (status != vk::Result::eSuccess) throw std::runtime_error("failed to submit command");
+	auto status = computeQueue_.submit(1, &computer_submit_info, computer_.fence);
+	if (status != vk::Result::eSuccess) 
+		throw std::runtime_error("failed to submit command");
+	status = device_.waitForFences(1, &computer_.fence, true, std::numeric_limits<uint64_t>::max());
+	if (status != vk::Result::eSuccess) 
+		throw std::runtime_error("failed to wait computer shader");
 
 	// draw 
 	device_.resetFences(fence_);
