@@ -840,8 +840,7 @@ vk::DescriptorPool Render::createCommonDescriptorPool()
 	descriptor_pool_info.setPoolSizeCount(pool_size.size())
 		.setPPoolSizes(pool_size.data())
 		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(1);
-
+		.setMaxSets(3);
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
 std::vector<vk::DescriptorSet> Render::createCommonDescriptorSet()
@@ -888,7 +887,7 @@ vk::DescriptorPool Render::createComputerDescriptorPool()
 	descriptor_pool_info.setPoolSizeCount(pool_size.size())
 		.setPPoolSizes(pool_size.data())
 		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(1);
+		.setMaxSets(3);
 
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
