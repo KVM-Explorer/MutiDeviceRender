@@ -25,7 +25,9 @@ int main() {
 
         auto vert = Render::createShaderModule("vert.spv");
         auto frag = Render::createShaderModule("frag.spv");
-        Render::createPipeline(vert, frag);
+        auto comp = Render::createShaderModule("comp.spv");
+    	Render::createPipeline(vert, frag);
+        Render::createComputerPipeline(comp);
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();

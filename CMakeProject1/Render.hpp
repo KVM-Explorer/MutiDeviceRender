@@ -19,6 +19,7 @@ public:
 	static void init(GLFWwindow* window);
 	static void quit();
 	static void createPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader);
+	static void createComputerPipeline(vk::ShaderModule computerShader);
 	static vk::ShaderModule createShaderModule(const char* filename);
 	static void render();
 	static void waitIdle();
@@ -31,6 +32,7 @@ private:
 	{
 		std::optional<uint32_t> graphicsIndices;
 		std::optional<uint32_t> presentIndices;
+		std::optional<uint32_t> computerIndices;
  	};
 	struct SwapChainRequiredInfo
 	{
@@ -83,7 +85,11 @@ private:
 	static vk::Buffer vertexBuffer_;
 	static vk::DeviceMemory vertexMemory_;
 	static Texture texture_;
-	
+	static vk::DescriptorSetLayout descriptorSetLayout_;
+	static vk::PipelineLayout pipelineLayout_;
+	static vk::DescriptorPool descriptorPool_;
+	static vk::DescriptorSet descriptorSet_;
+	static vk::Pipeline computerPipeline_;
 
 	static vk::Instance createInstance(std::vector<const char*>& extensions);
 	static vk::SurfaceKHR createSurface(GLFWwindow* window);
@@ -104,6 +110,7 @@ private:
 	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
 	static void createBuffer();
+
 	static void createTexture();
 	static vk::Sampler createTextureSampler();
 	static vk::ImageView createTextureViewImage(vk::Image);
@@ -111,6 +118,17 @@ private:
 		vk::ImageAspectFlags flags, vk::ImageLayout old_layout,vk::ImageLayout new_layout);
 	static vk::ImageMemoryBarrier createImageMemoryBarrier();
 	static void flushCommandBuffer(vk::CommandBuffer cmd_buffer);
+
+	
+	static vk::DescriptorSetLayout createDescriptorSetLayout();
+	static vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,
+		uint32_t binding, uint32_t descriptorCount = 1);
+	static vk::PipelineLayout createPipelineLayout();
+	//static vk::DescriptorSetLayoutCreateInfo createDescriptorSetLayout(const vk::DescriptorSetLayoutBinding* binding_ptr,uint32_t count);
+	static vk::DescriptorPool createDescriptorPool();
+	static vk::DescriptorSet createDescriptorSet();
+	static vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
+		uint32_t binding, vk::DescriptorImageInfo image_info);
 	
 
 	static QueueFamilyIndices queryPhysicalDevice();

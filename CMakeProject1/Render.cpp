@@ -12,6 +12,7 @@ vk::PhysicalDevice Render::physicalDevice_ = nullptr;
 vk::Device	Render::device_ = nullptr;
 vk::Queue	Render::graphicQueue_ = nullptr;
 vk::Queue	Render::presentQueue_ = nullptr;
+vk::Queue	Render::computeQueue_ = nullptr;
 vk::SwapchainKHR Render::swapchain_ = nullptr;
 std::vector<vk::Image> Render::images_;
 std::vector<vk::ImageView> Render::imageViews_;
@@ -28,6 +29,11 @@ vk::Fence Render::fence_ = nullptr;
 vk::Buffer Render::vertexBuffer_ = nullptr;
 vk::DeviceMemory Render::vertexMemory_ = nullptr;
 Render::Texture Render::texture_;
+vk::DescriptorSetLayout Render::descriptorSetLayout_ = nullptr;
+vk::PipelineLayout Render::pipelineLayout_ = nullptr;
+vk::DescriptorPool Render::descriptorPool_ = nullptr;
+vk::Pipeline Render::computerPipeline_ = nullptr;
+vk::DescriptorSet Render::descriptorSet_ = nullptr;
 
 struct Vertex {
 	glm::vec2 position;
@@ -157,6 +163,7 @@ void Render::init(GLFWwindow* window)
 
 	createBuffer();
 	createTexture();
+
 }
 
 vk::Instance Render::createInstance(std::vector<const char*>& extensions)
@@ -499,7 +506,13 @@ Render::QueueFamilyIndices Render::queryPhysicalDevice()
 		{
 			indices.presentIndices = idx;
 		}
-		if (indices.graphicsIndices && indices.presentIndices) break;
+		if(family.queueFlags | vk::QueueFlagBits::eCompute)
+		{
+			indices.computerIndices = idx;
+		}
+		if (indices.graphicsIndices && 
+			indices.presentIndices &&
+			indices.computerIndices) break;
 		idx++;
 	}
 	return indices;
@@ -558,7 +571,9 @@ Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 
 void Render::createTexture()
 {
-	texture_.image = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
+	texture_.image = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | 
+		vk::ImageUsageFlagBits::eSampled |
+		vk::ImageUsageFlagBits::eStorage);
 	texture_.memory = allocateMem(texture_.image);
 	
 	CHECK_NULL(texture_.image);
@@ -671,30 +686,157 @@ void Render::flushCommandBuffer(vk::CommandBuffer cmd_buffer)
 {
 	cmd_buffer.end();
 
-	// TODO 
-
 	vk::SubmitInfo submit_info;
 	submit_info.setCommandBufferCount(1)
 		.setPCommandBuffers(&cmd_buffer);
 
 	vk::FenceCreateInfo fence_info;
+	
 	vk::Fence fence = device_.createFence(fence_info);
 	CHECK_NULL(fence)
 
-	vk::Result result = graphicQueue_.submit(1,&submit_info, fence);
 	
-	//if (result.result != vk::Result::eSuccess) {
-	//	throw std::runtime_error("faied to commit command in texture");
-	//}
-	device_.waitForFences(fence, VK_TRUE, 100000000000);
-	//if (result.result != vk::Result::eSuccess)
-	//{
-	//	throw std::runtime_error("failed to wait texture fence");
-	//}
+	auto result = graphicQueue_.submit(1,&submit_info, fence);
+	
+	if (result != vk::Result::eSuccess) {
+		throw std::runtime_error("faied to commit command in texture");
+	}
+	result = device_.waitForFences(fence, true, 100000000000);
+	if (result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed to wait texture fence");
+	}
 	device_.destroyFence(fence);
 	device_.freeCommandBuffers(commandPool_,cmd_buffer);
 	return;
 }
+
+void Render::createComputerPipeline(vk::ShaderModule computerShader)
+{
+
+	vk::PipelineShaderStageCreateInfo shader_stage;
+	shader_stage.setModule(computerShader)
+		.setStage(vk::ShaderStageFlagBits::eCompute)
+		.setPName("main");
+
+	descriptorPool_ = createDescriptorPool();
+	
+	// set pipeline layout 
+	computeQueue_ = device_.getQueue(queueIndices_.computerIndices.value(), 0);
+	CHECK_NULL(computeQueue_)
+	descriptorSetLayout_ = createDescriptorSetLayout();
+	CHECK_NULL(descriptorSetLayout_)
+
+	pipelineLayout_ = createPipelineLayout();
+	CHECK_NULL(pipelineLayout_)
+
+	descriptorSet_ = createDescriptorSet();
+
+	// TODO fill with Shader
+	vk::ComputePipelineCreateInfo info;
+	info.setLayout(pipelineLayout_)
+		.setStage(shader_stage);
+		
+	auto result = device_.createComputePipeline(nullptr, info);
+	if(result.result!=vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed create computer pipeline");
+	}
+	computerPipeline_ = result.value;
+
+}
+
+vk::DescriptorSetLayout Render::createDescriptorSetLayout()
+{
+	vk::DescriptorSetLayoutCreateInfo info;
+	
+	std::array<vk::DescriptorSetLayoutBinding, 1> layout_bindings = {
+		setLayoutBinding(vk::DescriptorType::eStorageImage,vk::ShaderStageFlagBits::eCompute,0)	// binding=0 image
+	};
+
+	info.setPBindings(layout_bindings.data())
+		.setBindingCount(layout_bindings.size());
+	return device_.createDescriptorSetLayout(info);
+}
+
+vk::DescriptorSetLayoutBinding Render::setLayoutBinding(vk::DescriptorType type,vk::ShaderStageFlagBits flags,
+	uint32_t binding,uint32_t descriptorCount)
+{
+	vk::DescriptorSetLayoutBinding layout_set;
+	layout_set.setBinding(binding)
+		.setDescriptorType(type)
+		.setDescriptorCount(descriptorCount)
+		.setStageFlags(flags);
+
+	return layout_set;
+}
+// texture
+vk::PipelineLayout Render::createPipelineLayout()
+{
+	vk::PipelineLayoutCreateInfo  info;
+	info.setPSetLayouts(&descriptorSetLayout_)
+		.setSetLayoutCount(1);
+	return device_.createPipelineLayout(info);
+}
+
+vk::DescriptorPool Render::createDescriptorPool()
+{
+	auto createDescriptorSize = [](vk::DescriptorType type, uint32_t num)
+	{
+		vk::DescriptorPoolSize pool_size;
+		pool_size.setType(type)
+			.setDescriptorCount(num);
+		return pool_size;
+	};
+	std::array<vk::DescriptorPoolSize,1> pool_size{
+		createDescriptorSize(vk::DescriptorType::eStorageImage,1)
+	};
+	vk::DescriptorPoolCreateInfo descriptor_pool_info;
+	// TODO update max sets 
+	descriptor_pool_info.setPoolSizeCount(pool_size.size())
+		.setPPoolSizes(pool_size.data())
+		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+		.setMaxSets(3);
+
+	return device_.createDescriptorPool(descriptor_pool_info);
+}
+
+vk::DescriptorSet Render::createDescriptorSet()
+{
+	
+	vk::DescriptorSetAllocateInfo info;
+	info.setDescriptorPool(descriptorPool_)
+		.setSetLayouts(descriptorSetLayout_)
+		.setDescriptorSetCount(1);
+
+
+	auto result = device_.allocateDescriptorSets(info);
+
+	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
+		createWriteDescriptorSet(result[0],vk::DescriptorType::eStorageImage ,0,texture_.descriptor)
+	};
+
+	device_.updateDescriptorSets(write_descriptorset.size(), 
+		write_descriptorset.data(), 0, nullptr);
+	return result[0];
+}
+
+vk::WriteDescriptorSet Render::createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type, uint32_t binding, vk::DescriptorImageInfo image_info)
+{
+	vk::WriteDescriptorSet info;
+	info.setDstSet(descriptor_set)
+		.setDescriptorType(type)
+		.setDstBinding(binding)
+		.setPImageInfo(&image_info)
+		.setDescriptorCount(1);
+
+	return info;
+
+}
+
+
+
+
 
 
 Render::MemRequiredInfo Render::queryImageMemRequiredInfo(vk::Image image, vk::MemoryPropertyFlags flag)
@@ -735,7 +877,12 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 
 void Render::quit()
 {
-	// TODO 按顺序释放成员
+	// TODO release resource
+	device_.destroy(computerPipeline_);
+	device_.freeDescriptorSets(descriptorPool_,descriptorSet_);
+	device_.destroyDescriptorPool(descriptorPool_);
+	device_.destroyPipelineLayout(pipelineLayout_);
+	device_.destroyDescriptorSetLayout(descriptorSetLayout_);
 	device_.destroySampler(texture_.sampler);
 	device_.destroyImageView(texture_.imageView);
 	device_.freeMemory(texture_.memory);
