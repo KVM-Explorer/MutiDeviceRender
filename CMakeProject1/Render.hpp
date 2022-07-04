@@ -58,7 +58,13 @@ private:
 		vk::ImageView imageView;
 		vk::DescriptorImageInfo descriptor;
 	};
-	
+
+	struct Computer
+	{
+		vk::CommandPool commandPool;
+		vk::CommandBuffer commandBuffer;
+		vk::Fence fence;
+	};
 	static QueueFamilyIndices queueIndices_;
 	static SwapChainRequiredInfo requiredInfo_;
 
@@ -88,8 +94,9 @@ private:
 	static vk::DescriptorSetLayout descriptorSetLayout_;
 	static vk::PipelineLayout pipelineLayout_;
 	static vk::DescriptorPool descriptorPool_;
-	static vk::DescriptorSet descriptorSet_;
+	static std::vector<vk::DescriptorSet> descriptorSet_;
 	static vk::Pipeline computerPipeline_;
+	static Computer computer_;
 
 	static vk::Instance createInstance(std::vector<const char*>& extensions);
 	static vk::SurfaceKHR createSurface(GLFWwindow* window);
@@ -100,8 +107,8 @@ private:
 	static vk::PipelineLayout createLayout();
 	static vk::RenderPass createRenderPass();
 	static std::vector<vk::Framebuffer> createFreamebuffers();
-	static vk::CommandPool createCommandPool();
-	static vk::CommandBuffer createCommandBuffer();
+	static vk::CommandPool createCommandPool(vk::CommandPoolCreateFlagBits flags, uint32_t index);
+	static vk::CommandBuffer createCommandBuffer(vk::CommandPool command_pool);
 	static void recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer);
 	static vk::Semaphore createSemaphore();
 	static vk::Fence createFence();
@@ -126,10 +133,10 @@ private:
 	static vk::PipelineLayout createPipelineLayout();
 	//static vk::DescriptorSetLayoutCreateInfo createDescriptorSetLayout(const vk::DescriptorSetLayoutBinding* binding_ptr,uint32_t count);
 	static vk::DescriptorPool createDescriptorPool();
-	static vk::DescriptorSet createDescriptorSet();
+	static std::vector<vk::DescriptorSet> createDescriptorSet();
 	static vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
 		uint32_t binding, vk::DescriptorImageInfo image_info);
-	
+	static void recordRayTraceCommand();
 
 	static QueueFamilyIndices queryPhysicalDevice();
 	static SwapChainRequiredInfo querySwapChainRequiredInfo(int w,int h);

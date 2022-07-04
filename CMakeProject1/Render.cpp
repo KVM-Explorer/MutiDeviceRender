@@ -33,7 +33,8 @@ vk::DescriptorSetLayout Render::descriptorSetLayout_ = nullptr;
 vk::PipelineLayout Render::pipelineLayout_ = nullptr;
 vk::DescriptorPool Render::descriptorPool_ = nullptr;
 vk::Pipeline Render::computerPipeline_ = nullptr;
-vk::DescriptorSet Render::descriptorSet_ = nullptr;
+std::vector<vk::DescriptorSet> Render::descriptorSet_;
+Render::Computer Render::computer_;
 
 struct Vertex {
 	glm::vec2 position;
@@ -146,10 +147,10 @@ void Render::init(GLFWwindow* window)
 		CHECK_NULL(framebuffer);
 	}
 
-	commandPool_ = createCommandPool();
+	commandPool_ = createCommandPool(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,queueIndices_.graphicsIndices.value());
 	CHECK_NULL(commandPool_)
 
-	commandBuffer_ = createCommandBuffer();
+	commandBuffer_ = createCommandBuffer(commandPool_);
 	CHECK_NULL(commandBuffer_)
 
 	imageAvaliableSemaphore_ = createSemaphore();
@@ -355,19 +356,19 @@ std::vector<vk::Framebuffer> Render::createFreamebuffers()
 	return result;
 }
 
-vk::CommandPool Render::createCommandPool()
+vk::CommandPool Render::createCommandPool(vk::CommandPoolCreateFlagBits flags,uint32_t index)
 {
 	vk::CommandPoolCreateInfo info;
-	info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
-	info.setQueueFamilyIndex(queueIndices_.graphicsIndices.value());
+	info.setFlags(flags);
+	info.setQueueFamilyIndex(index);
 
 	return device_.createCommandPool(info);
 }
 
-vk::CommandBuffer Render::createCommandBuffer()
+vk::CommandBuffer Render::createCommandBuffer(vk::CommandPool command_pool)
 {
 	vk::CommandBufferAllocateInfo info;
-	info.setCommandPool(commandPool_);
+	info.setCommandPool(command_pool);
 	info.setCommandBufferCount(1);
 	info.setLevel(vk::CommandBufferLevel::ePrimary);
 
@@ -416,7 +417,6 @@ vk::Semaphore Render::createSemaphore()
 vk::Fence Render::createFence()
 {
 	vk::FenceCreateInfo info;
-	
 	return device_.createFence(info);
 }
 
@@ -582,7 +582,7 @@ void Render::createTexture()
 	device_.bindImageMemory(texture_.image, texture_.memory,0);
 	
 	
-	vk::CommandBuffer layout_cmd = createCommandBuffer();
+	vk::CommandBuffer layout_cmd = createCommandBuffer(commandPool_);
 
 	vk::CommandBufferBeginInfo begin_info;
 	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -720,7 +720,7 @@ void Render::createComputerPipeline(vk::ShaderModule computerShader)
 		.setPName("main");
 
 	descriptorPool_ = createDescriptorPool();
-	
+
 	// set pipeline layout 
 	computeQueue_ = device_.getQueue(queueIndices_.computerIndices.value(), 0);
 	CHECK_NULL(computeQueue_)
@@ -732,17 +732,27 @@ void Render::createComputerPipeline(vk::ShaderModule computerShader)
 
 	descriptorSet_ = createDescriptorSet();
 
-	// TODO fill with Shader
+	// fill with Shader
 	vk::ComputePipelineCreateInfo info;
 	info.setLayout(pipelineLayout_)
 		.setStage(shader_stage);
-		
+
 	auto result = device_.createComputePipeline(nullptr, info);
-	if(result.result!=vk::Result::eSuccess)
+	if (result.result != vk::Result::eSuccess)
 	{
 		throw std::runtime_error("failed create computer pipeline");
 	}
 	computerPipeline_ = result.value;
+
+	computer_.commandPool = createCommandPool(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueIndices_.computerIndices.value());
+	CHECK_NULL(computer_.commandPool)
+
+	computer_.commandBuffer = createCommandBuffer(computer_.commandPool);
+	CHECK_NULL(computer_.commandBuffer)
+
+	computer_.fence = createFence();
+	CHECK_NULL(computer_.fence)
+
 
 }
 
@@ -801,7 +811,7 @@ vk::DescriptorPool Render::createDescriptorPool()
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
 
-vk::DescriptorSet Render::createDescriptorSet()
+std::vector<vk::DescriptorSet> Render::createDescriptorSet()
 {
 	
 	vk::DescriptorSetAllocateInfo info;
@@ -818,7 +828,7 @@ vk::DescriptorSet Render::createDescriptorSet()
 
 	device_.updateDescriptorSets(write_descriptorset.size(), 
 		write_descriptorset.data(), 0, nullptr);
-	return result[0];
+	return result;
 }
 
 vk::WriteDescriptorSet Render::createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type, uint32_t binding, vk::DescriptorImageInfo image_info)
@@ -832,6 +842,25 @@ vk::WriteDescriptorSet Render::createWriteDescriptorSet(vk::DescriptorSet descri
 
 	return info;
 
+}
+
+void Render::recordRayTraceCommand()
+{
+	vk::CommandBufferBeginInfo info;
+	if(computer_.commandBuffer.begin(&info)!=vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed record Ray Trace command");
+	}
+	// bind commmand buffer with pipeline
+	computer_.commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, computerPipeline_);
+	computer_.commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout_, 
+		0, descriptorSet_.size(), descriptorSet_.data(),0,0);
+	// TODO update 
+	computer_.commandBuffer.dispatch(textureWidth / 16, textureHeight / 16, 1);
+
+
+
+	computer_.commandBuffer.end();
 }
 
 
@@ -878,8 +907,15 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 void Render::quit()
 {
 	// TODO release resource
+	
+	device_.freeCommandBuffers(computer_.commandPool,computer_.commandBuffer);
+	device_.destroyCommandPool(computer_.commandPool);
+	device_.destroyFence(computer_.fence);
 	device_.destroy(computerPipeline_);
-	device_.freeDescriptorSets(descriptorPool_,descriptorSet_);
+	for (auto &descriptor_set:descriptorSet_)
+	{
+		device_.freeDescriptorSets(descriptorPool_, descriptor_set);
+	}
 	device_.destroyDescriptorPool(descriptorPool_);
 	device_.destroyPipelineLayout(pipelineLayout_);
 	device_.destroyDescriptorSetLayout(descriptorSetLayout_);
