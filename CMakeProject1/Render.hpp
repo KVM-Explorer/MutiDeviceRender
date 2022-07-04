@@ -104,7 +104,7 @@ private:
 	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
 	static void createBuffer();
-	static void createTexture(std::string filename);
+	static void createTexture();
 	static vk::Sampler createTextureSampler();
 	static vk::ImageView createTextureViewImage(vk::Image);
 	static void  setImageLayout(vk::CommandBuffer cmd_buffer,vk::Image image,

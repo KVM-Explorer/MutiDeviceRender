@@ -156,7 +156,7 @@ void Render::init(GLFWwindow* window)
 	CHECK_NULL(fence_)
 
 	createBuffer();
-	//createTexture();
+	createTexture();
 }
 
 vk::Instance Render::createInstance(std::vector<const char*>& extensions)
@@ -556,7 +556,7 @@ Render::SwapChainRequiredInfo Render::querySwapChainRequiredInfo(int w, int h)
 	return info;
 }
 
-void Render::createTexture(std::string filename)
+void Render::createTexture()
 {
 	texture_.image = createImageDefine(vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled);
 	texture_.memory = allocateMem(texture_.image);
@@ -619,7 +619,7 @@ vk::ImageView Render::createTextureViewImage(vk::Image image)
 {
 	vk::ImageViewCreateInfo info;
 	info.setImage(image)
-		.setFormat(requiredInfo_.format.format)
+		.setFormat(vk::Format::eR32G32B32A32Sfloat)
 		.setViewType(vk::ImageViewType::e2D);
 	vk::ImageSubresourceRange range;
 	range.setBaseMipLevel(0)
@@ -736,7 +736,8 @@ Render::MemRequiredInfo Render::queryBufferMemRequiredInfo(vk::Buffer buffer, vk
 void Render::quit()
 {
 	// TODO 按顺序释放成员
-
+	device_.destroySampler(texture_.sampler);
+	device_.destroyImageView(texture_.imageView);
 	device_.freeMemory(texture_.memory);
 	device_.destroyImage(texture_.image);
 
@@ -886,7 +887,7 @@ vk::Image Render::createImageDefine(vk::ImageUsageFlags flag)
 		.setExtent(texture_extent)
 		.setMipLevels(1)
 		.setArrayLayers(1)
-		.setFormat(vk::Format::eR8G8B8A8Srgb)
+		.setFormat(vk::Format::eR32G32B32A32Sfloat)
 		.setSharingMode(vk::SharingMode::eExclusive)
 		.setTiling(vk::ImageTiling::eOptimal)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
