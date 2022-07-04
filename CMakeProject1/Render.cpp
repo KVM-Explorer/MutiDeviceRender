@@ -444,8 +444,20 @@ vk::DeviceMemory Render::allocateMem(vk::Buffer buffer)
 
 void Render::render()
 {
-	device_.resetFences(fence_);
+	// Computer Shader
+	//vk::Result status
+	auto status = device_.waitForFences(1, &computer_.fence, true, 100);
+	if (status != vk::Result::eSuccess) throw std::runtime_error("failed to wait computer shader");
+	device_.resetFences(computer_.fence);
 
+	vk::SubmitInfo computer_submit_info;
+	computer_submit_info.setCommandBuffers(computer_.commandBuffer)
+		.setCommandBufferCount(1);
+	status = computeQueue_.submit(1, &computer_submit_info, computer_.fence);
+	if (status != vk::Result::eSuccess) throw std::runtime_error("failed to submit command");
+
+	// draw 
+	device_.resetFences(fence_);
 	// acquire a image from swapchain
 	auto result = device_.acquireNextImageKHR(swapchain_, std::numeric_limits<uint64_t>::max(),
 		imageAvaliableSemaphore_, nullptr);	//Semaphore GPU-GPU fence CPU-GPU
@@ -806,7 +818,7 @@ vk::DescriptorPool Render::createDescriptorPool()
 	descriptor_pool_info.setPoolSizeCount(pool_size.size())
 		.setPPoolSizes(pool_size.data())
 		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(3);
+		.setMaxSets(1);
 
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
@@ -847,6 +859,7 @@ vk::WriteDescriptorSet Render::createWriteDescriptorSet(vk::DescriptorSet descri
 void Render::recordRayTraceCommand()
 {
 	vk::CommandBufferBeginInfo info;
+	info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	if(computer_.commandBuffer.begin(&info)!=vk::Result::eSuccess)
 	{
 		throw std::runtime_error("failed record Ray Trace command");
@@ -857,8 +870,6 @@ void Render::recordRayTraceCommand()
 		0, descriptorSet_.size(), descriptorSet_.data(),0,0);
 	// TODO update 
 	computer_.commandBuffer.dispatch(textureWidth / 16, textureHeight / 16, 1);
-
-
 
 	computer_.commandBuffer.end();
 }
