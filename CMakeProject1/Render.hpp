@@ -1,4 +1,6 @@
 #pragma once
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 #include <iostream>
@@ -18,7 +20,7 @@ class Render
 public:
 	static void init(GLFWwindow* window);
 	static void quit();
-	static void createPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader);
+	static void createCommonPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader);
 	static void createComputerPipeline(vk::ShaderModule computerShader);
 	static vk::ShaderModule createShaderModule(const char* filename);
 	static void render();
@@ -61,10 +63,38 @@ private:
 
 	struct Computer
 	{
+		std::vector<vk::DescriptorSet> descriptorSet;
+		vk::DescriptorSetLayout descriptorSetLayout;
+		vk::DescriptorPool descriptorPool;
+		vk::PipelineLayout pipelineLayout;
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
 		vk::Fence fence;
 	};
+
+	struct Graphics
+	{
+		vk::DescriptorSetLayout descriptorSetLayout;
+		std::vector<vk::DescriptorSet> descriptorSet;
+		vk::DescriptorPool descriptorPool;
+		vk::PipelineLayout pipelineLayout;
+		vk::Fence fence;
+		vk::CommandBuffer commandBuffer;
+		vk::CommandPool commandPool;
+		void release(vk::Device device)
+		{
+			/*device.freeCommandBuffers(commandPool, commandBuffer);
+			device.destroyCommandPool(commandPool);*/
+			device.destroyFence(fence);
+			for(auto & descriptor_set:descriptorSet)
+			{
+				device.freeDescriptorSets(descriptorPool, descriptor_set);
+			}
+			device.destroyDescriptorPool(descriptorPool);
+			device.destroyDescriptorSetLayout(descriptorSetLayout);
+		}
+	};
+
 	static QueueFamilyIndices queueIndices_;
 	static SwapChainRequiredInfo requiredInfo_;
 
@@ -80,14 +110,13 @@ private:
 	static std::vector<vk::ImageView> imageViews_;
 	static std::vector<vk::ShaderModule> shaderModules_;
 	static vk::Pipeline	pipeline_;
-	static vk::PipelineLayout layout_;
+	
 	static vk::RenderPass renderPass_;
 	static std::vector<vk::Framebuffer> frameBuffer_;
 	static vk::CommandPool commandPool_;
 	static vk::CommandBuffer commandBuffer_;
 	static vk::Semaphore imageAvaliableSemaphore_;
 	static vk::Semaphore renderFinishSemaphore_;;
-	static vk::Fence fence_;
 	static vk::Buffer vertexBuffer_;
 	static vk::DeviceMemory vertexMemory_;
 	static Texture texture_;
@@ -97,6 +126,7 @@ private:
 	static std::vector<vk::DescriptorSet> descriptorSet_;
 	static vk::Pipeline computerPipeline_;
 	static Computer computer_;
+	static Graphics graphics_;
 
 	static vk::Instance createInstance(std::vector<const char*>& extensions);
 	static vk::SurfaceKHR createSurface(GLFWwindow* window);
@@ -104,7 +134,7 @@ private:
 	static vk::Device createDevice();
 	static vk::SwapchainKHR createSwapchain();
 	static std::vector<vk::ImageView>	createImageViews();
-	static vk::PipelineLayout createLayout();
+	static vk::PipelineLayout createCommonPipelineLayout();
 	static vk::RenderPass createRenderPass();
 	static std::vector<vk::Framebuffer> createFreamebuffers();
 	static vk::CommandPool createCommandPool(vk::CommandPoolCreateFlagBits flags, uint32_t index);
@@ -126,14 +156,19 @@ private:
 	static vk::ImageMemoryBarrier createImageMemoryBarrier();
 	static void flushCommandBuffer(vk::CommandBuffer cmd_buffer);
 
-	
-	static vk::DescriptorSetLayout createDescriptorSetLayout();
 	static vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,
 		uint32_t binding, uint32_t descriptorCount = 1);
-	static vk::PipelineLayout createPipelineLayout();
-	//static vk::DescriptorSetLayoutCreateInfo createDescriptorSetLayout(const vk::DescriptorSetLayoutBinding* binding_ptr,uint32_t count);
-	static vk::DescriptorPool createDescriptorPool();
-	static std::vector<vk::DescriptorSet> createDescriptorSet();
+
+	// CommonPipeline Resource
+	static void createCommonDescriptor();
+	static vk::DescriptorSetLayout createCommonDescriptorSetLayout();
+	static vk::DescriptorPool createCommonDescriptorPool();
+	static std::vector<vk::DescriptorSet> createCommonDescriptorSet();
+	// ComputerPipeline Resource
+	static vk::DescriptorSetLayout createComputerDescriptorSetLayout();
+	static vk::PipelineLayout createComputerPipelineLayout();
+	static vk::DescriptorPool createComputerDescriptorPool();
+	static std::vector<vk::DescriptorSet> createComputerDescriptorSet();
 	static vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
 		uint32_t binding, vk::DescriptorImageInfo image_info);
 	static void recordRayTraceCommand();
