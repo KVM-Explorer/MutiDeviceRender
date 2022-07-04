@@ -445,19 +445,20 @@ vk::DeviceMemory Render::allocateMem(vk::Buffer buffer)
 void Render::render()
 {
 	// Computer Shader
-	//vk::Result status
 	device_.resetFences(computer_.fence);
+	recordRayTraceCommand();
 	vk::SubmitInfo computer_submit_info;
 	computer_submit_info.setCommandBuffers(computer_.commandBuffer)
 		.setCommandBufferCount(1);
 	auto status = computeQueue_.submit(1, &computer_submit_info, computer_.fence);
 	if (status != vk::Result::eSuccess) 
 		throw std::runtime_error("failed to submit command");
+	// wait computer shader fence
 	status = device_.waitForFences(1, &computer_.fence, true, std::numeric_limits<uint64_t>::max());
 	if (status != vk::Result::eSuccess) 
 		throw std::runtime_error("failed to wait computer shader");
 
-	// draw 
+	// prepare
 	device_.resetFences(fence_);
 	// acquire a image from swapchain
 	auto result = device_.acquireNextImageKHR(swapchain_, std::numeric_limits<uint64_t>::max(),
@@ -467,6 +468,8 @@ void Render::render()
 		throw std::runtime_error("acquire image failed");
 	}
 	uint32_t image_index = result.value;
+
+	// draw
 	commandBuffer_.reset();
 	recordCommand(commandBuffer_,frameBuffer_[image_index]);
 
@@ -478,6 +481,7 @@ void Render::render()
 		.setWaitDstStageMask(flags);
 	graphicQueue_.submit(submit_info,fence_);
 
+	// async different queue
 	vk::PresentInfoKHR present_info;
 	present_info.setImageIndices(image_index)
 		.setSwapchains(swapchain_)
