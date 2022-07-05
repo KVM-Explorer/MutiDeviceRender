@@ -23,9 +23,9 @@ int main() {
 
         Render::init(window);
 
-        auto vert = Render::createShaderModule("vert.spv");
-        auto frag = Render::createShaderModule("frag.spv");
-        auto comp = Render::createShaderModule("comp.spv");
+        auto vert = Render::createShaderModule("shaders/Texture.vert.spv");
+        auto frag = Render::createShaderModule("shaders/Texture.frag.spv");
+        auto comp = Render::createShaderModule("shaders/RayTrace.comp.spv");
     	Render::createCommonPipeline(vert, frag);
         Render::createComputerPipeline(comp);
 

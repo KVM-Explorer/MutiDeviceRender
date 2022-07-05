@@ -1,7 +1,6 @@
-﻿#version 460 core
-
-layout (local_size_x = 1,local_size_y = 1) in;
-layout(rgba32f,binding=0) uniform image2D img_output;
+#version 460 core
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rgba32f) uniform writeonly image2D resultImage;
 
 // TODO Define Init Constant
 const int imageWidth = 512;
@@ -53,17 +52,17 @@ vec3 rayReflect(vec3 v,vec3 n);
 vec3 gamma2(vec3 color);
 vec3 multiSmaples(vec3 color,int num);
 
-
-
 void main()
 {
-    // image
-    const float aspect_ratio = 512.0 / 256.0;
+    vec3 finalColor = vec3(1,0,0);
+
+// image
+    float aspect_ratio = imageWidth / imageHeight;
     const int image_width = imageWidth;
     const int image_height = int(image_width / aspect_ratio);
  
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 dims = imageSize(img_output);
+    ivec2 dims = imageSize(resultImage);
 
     float scale_x = pixel_coords.x / float(dims.x);
     float scale_y = pixel_coords.y / float(dims.y);
@@ -100,9 +99,9 @@ void main()
     color = gamma2(color);
     vec4 pixel = vec4(color,1.f);
     
-    imageStore(img_output, pixel_coords, pixel);
-    
+    imageStore(resultImage, pixel_coords, pixel);
 }
+
 
 // range: 0-1
 float rand(float x)
