@@ -14,8 +14,8 @@ vk::Queue	Render::graphicQueue_ = nullptr;
 vk::Queue	Render::presentQueue_ = nullptr;
 vk::Queue	Render::computeQueue_ = nullptr;
 vk::SwapchainKHR Render::swapchain_ = nullptr;
-std::vector<vk::Image> Render::images_;
-std::vector<vk::ImageView> Render::imageViews_;
+std::vector<vk::Image> Render::swapchainImages_;
+std::vector<vk::ImageView> Render::swapchainImageViews_;
 std::vector<vk::ShaderModule> Render::shaderModules_;
 vk::Pipeline	Render::pipeline_ = nullptr;
 vk::RenderPass Render::renderPass_ = nullptr;
@@ -129,8 +129,8 @@ void Render::init(GLFWwindow* window)
 
 	swapchain_ = createSwapchain();
 	CHECK_NULL(swapchain_)
-	images_ = device_.getSwapchainImagesKHR(swapchain_);
-	imageViews_ = createImageViews();
+	swapchainImages_ = device_.getSwapchainImagesKHR(swapchain_);
+	swapchainImageViews_ = createImageViews();
 	
 	renderPass_ = createRenderPass();
 	CHECK_NULL(renderPass_)
@@ -278,11 +278,11 @@ vk::SwapchainKHR Render::createSwapchain()
 
 std::vector<vk::ImageView> Render::createImageViews()
 {
-	std::vector<vk::ImageView> views(images_.size());
+	std::vector<vk::ImageView> views(swapchainImages_.size());
 	for (int i=0;i<views.size();i++)
 	{
 		vk::ImageViewCreateInfo info;
-		info.setImage(images_[i])
+		info.setImage(swapchainImages_[i])
 			.setFormat(requiredInfo_.format.format)
 			.setViewType(vk::ImageViewType::e2D);
 		vk::ImageSubresourceRange range;
@@ -340,14 +340,14 @@ std::vector<vk::Framebuffer> Render::createFreamebuffers()
 	// 对于每个imageview 创建framebuffer
 	std::vector<vk::Framebuffer> result;
 
-	for (int i=0;i<imageViews_.size();i++)
+	for (int i=0;i<swapchainImageViews_.size();i++)
 	{
 		vk::FramebufferCreateInfo info;
 		info.setRenderPass(renderPass_);
 		info.setLayers(1);
 		info.setWidth(requiredInfo_.extent.width);
 		info.setHeight(requiredInfo_.extent.height);
-		info.setAttachments(imageViews_[i]);
+		info.setAttachments(swapchainImageViews_[i]);
 
 		result.push_back(device_.createFramebuffer(info));
 	}
@@ -422,18 +422,18 @@ vk::Fence Render::createFence()
 	return device_.createFence(info);
 }
 
-vk::Buffer Render::createVertexBufferDefine(vk::BufferUsageFlags flag)
+vk::Buffer Render::createBufferDefine(vk::BufferUsageFlags flag, size_t size, uint32_t family_indices)
 {
 	vk::BufferCreateInfo info;
 	info.setSharingMode(vk::SharingMode::eExclusive)
-		.setQueueFamilyIndices(queueIndices_.graphicsIndices.value())
-		.setSize(sizeof(vertices))
+		.setQueueFamilyIndices(family_indices)
+		.setSize(size)
 		.setUsage(flag);
 
 	return device_.createBuffer(info);
 }
 
-vk::DeviceMemory Render::allocateMem(vk::Buffer buffer)
+vk::DeviceMemory Render::allocateMemory(vk::Buffer buffer)
 {
 	auto requirement = queryBufferMemRequiredInfo(buffer, 
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -539,8 +539,8 @@ Render::QueueFamilyIndices Render::queryPhysicalDevice()
 
 void Render::createBuffer()
 {
-	vertexBuffer_ = createVertexBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer);
-	vertexMemory_ = allocateMem(vertexBuffer_);
+	vertexBuffer_ = createBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer, sizeof(vertices), queueIndices_.graphicsIndices.value());
+	vertexMemory_ = allocateMemory(vertexBuffer_);
 
 	CHECK_NULL(vertexBuffer_)
 	CHECK_NULL(vertexMemory_)
@@ -605,7 +605,6 @@ void Render::createTexture()
 
 	vk::CommandBufferBeginInfo begin_info;
 	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-	
 	if (layout_cmd.begin(&begin_info) != vk::Result::eSuccess)
 	{
 		throw std::runtime_error("command buffer record failed");
@@ -738,18 +737,29 @@ void Render::createComputerPipeline(vk::ShaderModule computerShader)
 		.setStage(vk::ShaderStageFlagBits::eCompute)
 		.setPName("main");
 
-	descriptorPool_ = createComputerDescriptorPool();
+	createTexture();
+	createUniformBuffer();
 
-	// set pipeline layout 
+	// set pipeline layout
+	descriptorPool_ = createComputerDescriptorPool();
+	CHECK_NULL(descriptorPool_)
+
 	computeQueue_ = device_.getQueue(queueIndices_.computerIndices.value(), 0);
 	CHECK_NULL(computeQueue_)
 	descriptorSetLayout_ = createComputerDescriptorSetLayout();
 	CHECK_NULL(descriptorSetLayout_)
 
+
 	pipelineLayout_ = createComputerPipelineLayout();
 	CHECK_NULL(pipelineLayout_)
 
+
+
 	descriptorSet_ = createComputerDescriptorSet();
+	if(descriptorSet_.size()==0)
+	{
+		throw std::runtime_error("failed create computer descriptor Set");
+	}
 
 	// fill with Shader
 	vk::ComputePipelineCreateInfo info;
@@ -779,8 +789,9 @@ vk::DescriptorSetLayout Render::createComputerDescriptorSetLayout()
 {
 	vk::DescriptorSetLayoutCreateInfo info;
 	
-	std::array<vk::DescriptorSetLayoutBinding, 1> layout_bindings = {
-		setLayoutBinding(vk::DescriptorType::eStorageImage,vk::ShaderStageFlagBits::eCompute,0)	// binding=0 image
+	std::array<vk::DescriptorSetLayoutBinding, 2> layout_bindings = {
+		setLayoutBinding(vk::DescriptorType::eStorageImage,vk::ShaderStageFlagBits::eCompute,0),	// binding=0 image
+		setLayoutBinding(vk::DescriptorType::eUniformBuffer,vk::ShaderStageFlagBits::eCompute,1)
 	};
 
 	info.setPBindings(layout_bindings.data())
@@ -798,6 +809,27 @@ vk::DescriptorSetLayoutBinding Render::setLayoutBinding(vk::DescriptorType type,
 		.setStageFlags(flags);
 
 	return layout_set;
+}
+void Render::createUniformBuffer()
+{
+	computer_.uboBuffer = createBufferDefine(vk::BufferUsageFlagBits::eVertexBuffer, sizeof(vertices), queueIndices_.graphicsIndices.value());
+	computer_.uboMemory = allocateMemory(computer_.uboBuffer);
+
+	CHECK_NULL(vertexBuffer_)
+	CHECK_NULL(vertexMemory_)
+
+	device_.bindBufferMemory(computer_.uboBuffer, computer_.uboMemory, 0);
+
+	// TODO binding  UBO descrptor
+	
+	//vk::DescriptorSetAllocateInfo allocate_info;
+}
+void Render::updateUniformBuffer(UBO ubo)
+{
+	// Mapping
+	void* data = device_.mapMemory(computer_.uboMemory, 0, sizeof(ubo));
+	memcpy(data, &ubo, sizeof(ubo));
+	device_.unmapMemory(computer_.uboMemory);
 }
 void Render::createCommonDescriptor()
 {
@@ -845,7 +877,7 @@ vk::DescriptorPool Render::createCommonDescriptorPool()
 	descriptor_pool_info.setPoolSizeCount(pool_size.size())
 		.setPPoolSizes(pool_size.data())
 		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(3);
+		.setMaxSets(1);
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
 std::vector<vk::DescriptorSet> Render::createCommonDescriptorSet()
@@ -859,7 +891,7 @@ std::vector<vk::DescriptorSet> Render::createCommonDescriptorSet()
 	auto result = device_.allocateDescriptorSets(info);
 
 	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
-		createWriteDescriptorSet(result[0],vk::DescriptorType::eCombinedImageSampler ,0,texture_.descriptor)
+		createWriteDescriptorImageSet(result[0],vk::DescriptorType::eCombinedImageSampler ,0,texture_.descriptor)
 	};
 
 	device_.updateDescriptorSets(write_descriptorset.size(),
@@ -871,7 +903,7 @@ vk::PipelineLayout Render::createComputerPipelineLayout()
 {
 	vk::PipelineLayoutCreateInfo  info;
 	info.setPSetLayouts(&descriptorSetLayout_)
-		.setSetLayoutCount(1);
+		.setSetLayoutCount(2);
 	return device_.createPipelineLayout(info);
 }
 
@@ -884,15 +916,16 @@ vk::DescriptorPool Render::createComputerDescriptorPool()
 			.setDescriptorCount(num);
 		return pool_size;
 	};
-	std::array<vk::DescriptorPoolSize,1> pool_size{
-		createDescriptorSize(vk::DescriptorType::eStorageImage,1)
+	std::array<vk::DescriptorPoolSize,2> pool_size{
+		createDescriptorSize(vk::DescriptorType::eStorageImage,1),
+		createDescriptorSize(vk::DescriptorType::eUniformBuffer,1)
 	};
 	vk::DescriptorPoolCreateInfo descriptor_pool_info;
 	// TODO update max sets 
 	descriptor_pool_info.setPoolSizeCount(pool_size.size())
 		.setPPoolSizes(pool_size.data())
 		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-		.setMaxSets(3);
+		.setMaxSets(1);
 
 	return device_.createDescriptorPool(descriptor_pool_info);
 }
@@ -908,8 +941,9 @@ std::vector<vk::DescriptorSet> Render::createComputerDescriptorSet()
 
 	auto result = device_.allocateDescriptorSets(info);
 
-	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
-		createWriteDescriptorSet(result[0],vk::DescriptorType::eStorageImage ,0,texture_.descriptor)
+	std::array<vk::WriteDescriptorSet, 2> write_descriptorset{
+		createWriteDescriptorImageSet(result[0],vk::DescriptorType::eStorageImage ,0,texture_.descriptor),
+		createWriteDescriptorUBOSet(result[1],vk::DescriptorType::eUniformBuffer,1,computer_.uboBuffer)
 	};
 
 	device_.updateDescriptorSets(write_descriptorset.size(), 
@@ -917,18 +951,33 @@ std::vector<vk::DescriptorSet> Render::createComputerDescriptorSet()
 	return result;
 }
 
-vk::WriteDescriptorSet Render::createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type, uint32_t binding, vk::DescriptorImageInfo image_info)
+vk::WriteDescriptorSet Render::createWriteDescriptorImageSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type, uint32_t binding, vk::DescriptorImageInfo image_info)
 {
 	vk::WriteDescriptorSet info;
 	info.setDstSet(descriptor_set)
 		.setDescriptorType(type)
 		.setDstBinding(binding)
-		.setPImageInfo(&image_info)
+		.setImageInfo(image_info)
 		.setDescriptorCount(1);
 
 	return info;
 
 }
+
+vk::WriteDescriptorSet Render::createWriteDescriptorUBOSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type, 
+	uint32_t binding, vk::DescriptorBufferInfo buffer_info)
+{
+	vk::WriteDescriptorSet info;
+	info.setDstSet(descriptor_set)
+		.setDescriptorType(type)
+		.setDstBinding(binding)
+		.setBufferInfo(buffer_info)
+		.setDescriptorCount(1);
+
+	return info;
+
+}
+
 
 void Render::recordRayTraceCommand()
 {
@@ -946,6 +995,8 @@ void Render::recordRayTraceCommand()
 	computer_.commandBuffer.dispatch(textureWidth / 16, textureHeight / 16, 1);
 
 	computer_.commandBuffer.end();
+
+	
 }
 
 
@@ -1030,7 +1081,7 @@ void Render::quit()
 		device_.destroyShaderModule(shader);
 	}
 
-	for(auto &view:imageViews_)
+	for(auto &view:swapchainImageViews_)
 	{
 		device_.destroyImageView(view);
 	}

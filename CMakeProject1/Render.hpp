@@ -18,6 +18,14 @@
 class Render
 {
 public:
+	struct UBO
+	{
+		int imageWidth;
+		int imageHeight;
+		int samplesNum;	// 多重采样
+	};
+
+
 	static void init(GLFWwindow* window);
 	static void quit();
 	static void createCommonPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader);
@@ -61,6 +69,8 @@ private:
 		vk::DescriptorImageInfo descriptor;
 	};
 
+	
+
 	struct Computer
 	{
 		std::vector<vk::DescriptorSet> descriptorSet;
@@ -70,7 +80,13 @@ private:
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
 		vk::Fence fence;
+		UBO ubo;
+		vk::Buffer uboBuffer;
+		vk::DeviceMemory uboMemory;
+
 	};
+
+	
 
 	struct Graphics
 	{
@@ -95,6 +111,8 @@ private:
 		}
 	};
 
+	
+
 	static QueueFamilyIndices queueIndices_;
 	static SwapChainRequiredInfo requiredInfo_;
 
@@ -106,8 +124,8 @@ private:
 	static vk::Queue	presentQueue_;
 	static vk::Queue	computeQueue_;
 	static vk::SwapchainKHR swapchain_;
-	static std::vector<vk::Image> images_;
-	static std::vector<vk::ImageView> imageViews_;
+	static std::vector<vk::Image> swapchainImages_;
+	static std::vector<vk::ImageView> swapchainImageViews_;
 	static std::vector<vk::ShaderModule> shaderModules_;
 	static vk::Pipeline	pipeline_;
 	
@@ -127,6 +145,7 @@ private:
 	static vk::Pipeline computerPipeline_;
 	static Computer computer_;
 	static Graphics graphics_;
+	
 
 	static vk::Instance createInstance(std::vector<const char*>& extensions);
 	static vk::SurfaceKHR createSurface(GLFWwindow* window);
@@ -142,9 +161,9 @@ private:
 	static void recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer);
 	static vk::Semaphore createSemaphore();
 	static vk::Fence createFence();
-	static vk::Buffer createVertexBufferDefine(vk::BufferUsageFlags flag);
+	static vk::Buffer createBufferDefine(vk::BufferUsageFlags flag, size_t size, uint32_t family_indices);
 	static vk::Image createImageDefine(vk::ImageUsageFlags flag);
-	static vk::DeviceMemory allocateMem(vk::Buffer buffer);
+	static vk::DeviceMemory allocateMemory(vk::Buffer buffer);
 	static vk::DeviceMemory allocateMem(vk::Image image);
 	static void createBuffer();
 
@@ -159,6 +178,10 @@ private:
 	static vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,
 		uint32_t binding, uint32_t descriptorCount = 1);
 
+	// Uniform Buffer
+	static void createUniformBuffer();
+	static void updateUniformBuffer(UBO ubo);
+
 	// CommonPipeline Resource
 	static void createCommonDescriptor();
 	static vk::DescriptorSetLayout createCommonDescriptorSetLayout();
@@ -169,8 +192,11 @@ private:
 	static vk::PipelineLayout createComputerPipelineLayout();
 	static vk::DescriptorPool createComputerDescriptorPool();
 	static std::vector<vk::DescriptorSet> createComputerDescriptorSet();
-	static vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
+	static vk::WriteDescriptorSet createWriteDescriptorImageSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
 		uint32_t binding, vk::DescriptorImageInfo image_info);
+	static vk::WriteDescriptorSet Render::createWriteDescriptorUBOSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,
+		uint32_t binding, vk::DescriptorBufferInfo buffer_info);
+
 	static void recordRayTraceCommand();
 
 	static QueueFamilyIndices queryPhysicalDevice();
