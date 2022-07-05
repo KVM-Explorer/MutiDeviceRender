@@ -211,7 +211,7 @@ vk::PhysicalDevice Render::pickupPhysicalDevice()
 vk::Device Render::createDevice()
 {
 	std::vector<vk::DeviceQueueCreateInfo> queue_infos;
-
+	
 	if(queueIndices_.graphicsIndices.value()==queueIndices_.presentIndices.value())
 	{
 		vk::DeviceQueueCreateInfo info;
@@ -392,6 +392,10 @@ void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 		.setFramebuffer(framebuffer);
 
 	buffer.beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
+
+	// TODO binding descriptor Image with pipeline
+	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, graphics_.pipelineLayout, 0, 1, graphics_.descriptorSet.data(), 0, 0);
+
 
 	buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline_);
 
@@ -804,6 +808,7 @@ void Render::createCommonDescriptor()
 	graphics_.pipelineLayout = createCommonPipelineLayout();
 	CHECK_NULL(graphics_.pipelineLayout)
 	graphics_.descriptorSet = createCommonDescriptorSet();
+
 	if (graphics_.descriptorSet.size()==0)
 	{
 		throw std::runtime_error("failed create common descriptor set");
