@@ -376,6 +376,7 @@ vk::CommandBuffer Render::createCommandBuffer(vk::CommandPool command_pool)
 
 void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 {
+	
 	vk::CommandBufferBeginInfo begin_info;
 	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
@@ -387,7 +388,9 @@ void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 	vk::ClearColorValue clear_color(std::array<float,4>{0.1f,0.1f,0.1f,1.f});
 	vk::ClearValue value(clear_color);
 	render_pass_begin_info.setRenderPass(renderPass_)
-		.setRenderArea(vk::Rect2D({200,0},{600,600}))
+		.setRenderArea(vk::Rect2D(
+			{0,0},
+			requiredInfo_.extent))
 		.setClearValues(value)
 		.setFramebuffer(framebuffer);
 
@@ -407,6 +410,8 @@ void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 	buffer.endRenderPass();
 
 	buffer.end();
+
+
 }
 
 vk::Semaphore Render::createSemaphore()
@@ -1078,7 +1083,8 @@ void Render::createCommonPipeline(vk::ShaderModule vertex_shader, vk::ShaderModu
 		requiredInfo_.extent.width, 
 		requiredInfo_.extent.height,
 		0, 1);
-	vk::Rect2D scissor({ 0,0 }, requiredInfo_.extent);
+	vk::Rect2D scissor({ 200,0 }, 
+		{ requiredInfo_.extent.width - 200,requiredInfo_.extent.height });
 	viewport_state.setViewports(viewport)
 		.setScissors(scissor);
 	info.setPViewportState(&viewport_state);
