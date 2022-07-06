@@ -54,19 +54,39 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(iGPU_.graphicPipeline.commandBuffer)
 
-
 	dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 			dGPU_.queueIndices.computerIndices.value());
 	CHECK_NULL(dGPU_.graphicPipeline.commandPool)
 	dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(dGPU_.graphicPipeline.commandBuffer)
 
+	
+		// Semaphore include semaphore and fence
+	iGPU_.graphicPipeline.imageAvaliableSemaphore = createSemaphore(iGPU_.device);
+	iGPU_.graphicPipeline.presentAvaliableSemaphore = createSemaphore(iGPU_.device);
+	iGPU_.graphicPipeline.fence = createFence(iGPU_.device);
+
+	dGPU_.graphicPipeline.imageAvaliableSemaphore = createSemaphore(dGPU_.device);
+	//dGPU_.graphicPipeline.presentAvaliableSemaphore = createSemaphore(dGPU_.device);
+	dGPU_.graphicPipeline.fence = createFence(dGPU_.device);
+
+	
+
 
 }
 
 void MultiRender::release()
 {
+
+	// semaphore
+	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.presentAvaliableSemaphore);
+	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.imageAvaliableSemaphore);
+	iGPU_.device.destroyFence(iGPU_.graphicPipeline.fence);
+
+	dGPU_.device.destroySemaphore(dGPU_.graphicPipeline.imageAvaliableSemaphore);
+	dGPU_.device.destroyFence(dGPU_.graphicPipeline.fence);
 	
+
 	iGPU_.device.freeCommandBuffers(iGPU_.graphicPipeline.commandPool, iGPU_.graphicPipeline.commandBuffer);
 	dGPU_.device.freeCommandBuffers(dGPU_.graphicPipeline.commandPool, dGPU_.graphicPipeline.commandBuffer);
 	iGPU_.device.destroyCommandPool(iGPU_.graphicPipeline.commandPool);
@@ -344,6 +364,19 @@ vk::CommandBuffer MultiRender::createCommandBuffer(vk::Device device, vk::Comman
 
 	//TODO ×¢Òâcommand buffer
 	return device.allocateCommandBuffers(info)[0];
+}
+
+vk::Semaphore MultiRender::createSemaphore(vk::Device device)
+{
+	vk::SemaphoreCreateInfo info;
+
+	return device.createSemaphore(info);
+}
+
+vk::Fence MultiRender::createFence(vk::Device device)
+{
+	vk::FenceCreateInfo info;
+	return device.createFence(info);
 }
 
 RAII::QueueFamilyIndices MultiRender::queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device)

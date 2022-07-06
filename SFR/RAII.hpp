@@ -24,6 +24,8 @@ namespace RAII
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
 		vk::Fence fence;
+		vk::Semaphore imageAvaliableSemaphore;
+		vk::Semaphore presentAvaliableSemaphore;
 	};
 
 	struct Device

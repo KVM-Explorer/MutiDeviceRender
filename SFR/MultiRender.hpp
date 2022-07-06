@@ -36,9 +36,12 @@ private:
 	std::vector<vk::ImageView> createSwapchainImageViews();
 	vk::RenderPass createRenderPass(vk::Device);
 	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass);
+
+	// Pipeline
 	vk::CommandPool createCommandPool(vk::Device device,vk::CommandPoolCreateFlagBits flags, uint32_t index);
 	vk::CommandBuffer createCommandBuffer(vk::Device device,vk::CommandPool command_pool);
-
+	vk::Semaphore createSemaphore(vk::Device device);
+	vk::Fence createFence(vk::Device device);
 
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
