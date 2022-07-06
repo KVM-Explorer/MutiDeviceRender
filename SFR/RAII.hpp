@@ -15,6 +15,10 @@ namespace RAII
 		vk::Device device;
 		vk::PhysicalDevice physicalDevice;
 		QueueFamilyIndices queueIndices;
+		vk::Queue graphicsQueue;
+		vk::Queue computerQueue;
+		vk::Queue presentQueue;
+
 	};
 
 
