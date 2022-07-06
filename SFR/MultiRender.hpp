@@ -3,6 +3,8 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include "RAII.hpp"
+#include <fstream>
+#include <istream>
 
 class MultiRender
 {
@@ -12,10 +14,10 @@ public:
 	void render();
 	void waitIdle();
 
-	vk::ShaderModule createShaderModule(const char* filename);
+	vk::ShaderModule createShaderModule(const char* filename, int device_index);
 	void createComputerPipeline(vk::ShaderModule computerShader);
 	// create iGPU dGPU pipeline
-	void createCommonPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader);
+	void createCommonPipeline(vk::ShaderModule vertexShader, vk::ShaderModule fragShader, int device_index);
 
 private:
 	vk::Instance instance_;
@@ -23,8 +25,7 @@ private:
 	RAII::Device iGPU_;
 	RAII::Device dGPU_;
 	RAII::SwapChainRequiredInfo swapchainRequiredInfo_;
-	RAII::SwapChain swapchain_;
-	RAII::Descriptor vertex_;
+	
 	
 
 private:
@@ -33,19 +34,22 @@ private:
 	void createPhysicalDevice();
 	vk::Device createDevice(RAII::Device &device);
 	void createQueue();
-	vk::SwapchainKHR createSwapchain();
-	std::vector<vk::ImageView> createSwapchainImageViews();
+	vk::SwapchainKHR createSwapchain(vk::Device device, RAII::QueueFamilyIndices);
+	std::vector<vk::ImageView> createSwapchainImageViews(vk::Device device, RAII::SwapChain swapchain);
 	vk::RenderPass createRenderPass(vk::Device);
-	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass);
+	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass, RAII::SwapChain swapchain);
 
 	// Pipeline
 	vk::CommandPool createCommandPool(vk::Device device,vk::CommandPoolCreateFlagBits flags, uint32_t index);
 	vk::CommandBuffer createCommandBuffer(vk::Device device,vk::CommandPool command_pool);
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
+	void recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame);
+	vk::PipelineLayout createPipelineLayout(RAII::Device device);
+	void createRenderDescriptor(RAII::Device device);
 
 	// Descriptor
-	void createVertexBuffer(RAII::Device device);
+	void createVertexBuffer(RAII::Device &device);
 	vk::DeviceMemory allocateMemory(RAII::Device device, vk::Buffer buffer);
 	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
 

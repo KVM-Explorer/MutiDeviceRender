@@ -62,6 +62,8 @@ add_executable (${TARGET_NAME} ${TARGET_HEADER} ${TARGET_SOURCE})
 add_shader(${TARGET_NAME} "RayTrace.comp")
 add_shader(${TARGET_NAME} "Texture.vert")
 add_shader(${TARGET_NAME} "Texture.frag")
+add_shader(${TARGET_NAME} "Common.vert")
+add_shader(${TARGET_NAME} "Common.frag")
 
 message(STATUS ${TARGET_SOURCE})
 message(STATUS ${TARGET_HEADER})

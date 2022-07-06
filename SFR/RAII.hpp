@@ -22,6 +22,8 @@ namespace RAII
 	};
 	struct Pipeline
 	{
+		std::vector<vk::ShaderModule> shaders;
+		vk::Pipeline pipeline;
 		vk::PipelineLayout pipelineLayout;
 		vk::CommandPool commandPool;
 		vk::CommandBuffer commandBuffer;
@@ -29,7 +31,12 @@ namespace RAII
 		vk::Semaphore imageAvaliableSemaphore;
 		vk::Semaphore presentAvaliableSemaphore;
 	};
-
+	struct SwapChain
+	{
+		vk::SwapchainKHR swapchain;
+		std::vector<vk::Image>	images;
+		std::vector<vk::ImageView> imageViews;
+	};
 	struct Device
 	{
 		vk::Device device;
@@ -42,14 +49,11 @@ namespace RAII
 		std::vector<vk::Framebuffer> frameBuffer;
 		Pipeline computerPipeline;
 		Pipeline graphicPipeline;
+		SwapChain swapchain;
+		Descriptor vertex;
 	};
 
-	struct SwapChain
-	{
-		vk::SwapchainKHR swapchain;
-		std::vector<vk::Image>	images;
-		std::vector<vk::ImageView> imageViews;
-	};
+	
 
 
 	struct SwapChainRequiredInfo

@@ -24,17 +24,22 @@ int main() {
 
        render.init(window);
 
-        //auto vert = Render::createShaderModule("shaders/Texture.vert.spv");
-        //auto frag = Render::createShaderModule("shaders/Texture.frag.spv");
+        auto vert = render.createShaderModule("shaders/Common.vert.spv",0);
+        auto frag = render.createShaderModule("shaders/Common.frag.spv",0);
+        render.createCommonPipeline(vert, frag, 0);
+
+        //vert = render.createShaderModule("shaders/Common.vert.spv", 1);
+        //frag = render.createShaderModule("shaders/Common.frag.spv", 1);
+        //render.createCommonPipeline(vert, frag, 1);
         //auto comp = Render::createShaderModule("shaders/RayTrace.comp.spv");
-        //Render::createCommonPipeline(vert, frag);
+		
         //Render::createComputerPipeline(comp);
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
-            //Render::render();
+            render.render();
         }
-        //Render::waitIdle();
+        render.waitIdle();
 
         render.release();
 
