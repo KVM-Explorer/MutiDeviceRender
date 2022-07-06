@@ -38,14 +38,45 @@ void MultiRender::init(GLFWwindow* window)
 	swapchain_.images = iGPU_.device.getSwapchainImagesKHR(swapchain_.swapchain);
 	swapchain_.imageViews = createSwapchainImageViews();
 
+	// Render Pass
+	iGPU_.renderPass = createRenderPass(iGPU_.device);
+	dGPU_.renderPass = createRenderPass(dGPU_.device);
 	
+	// Frame Buffer TODO Only iGPU
+	iGPU_.frameBuffer = createFrameBuffers(iGPU_.device,iGPU_.renderPass);
+	//dGPU_.frameBuffer = createFrameBuffers(dGPU_.device,dGPU_.renderPass);
+
+	// CommandPool Command Buffer
+	
+	iGPU_.graphicPipeline.commandPool = createCommandPool(iGPU_.device,vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
+		iGPU_.queueIndices.computerIndices.value());
+	CHECK_NULL(iGPU_.graphicPipeline.commandPool)
+	iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
+	CHECK_NULL(iGPU_.graphicPipeline.commandBuffer)
 
 
-	
+	dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+			dGPU_.queueIndices.computerIndices.value());
+	CHECK_NULL(dGPU_.graphicPipeline.commandPool)
+	dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
+	CHECK_NULL(dGPU_.graphicPipeline.commandBuffer)
+
+
 }
 
 void MultiRender::release()
 {
+	
+	iGPU_.device.freeCommandBuffers(iGPU_.graphicPipeline.commandPool, iGPU_.graphicPipeline.commandBuffer);
+	dGPU_.device.freeCommandBuffers(dGPU_.graphicPipeline.commandPool, dGPU_.graphicPipeline.commandBuffer);
+	iGPU_.device.destroyCommandPool(iGPU_.graphicPipeline.commandPool);
+	dGPU_.device.destroyCommandPool(dGPU_.graphicPipeline.commandPool);
+	for(auto &frame_buffer:iGPU_.frameBuffer)
+	{
+		iGPU_.device.destroyFramebuffer(frame_buffer);
+	}
+	iGPU_.device.destroyRenderPass(iGPU_.renderPass);
+	dGPU_.device.destroyRenderPass(dGPU_.renderPass);
 	for(auto &view:swapchain_.imageViews)
 	{
 		iGPU_.device.destroyImageView(view);
@@ -190,6 +221,7 @@ void MultiRender::createQueue()
 vk::SwapchainKHR MultiRender::createSwapchain()
 {
 	vk::SwapchainCreateInfoKHR info;
+	
 	info.setImageColorSpace(swapchainRequiredInfo_.format.colorSpace)
 		.setImageFormat(swapchainRequiredInfo_.format.format)
 		.setMinImageCount(swapchainRequiredInfo_.imageCount)
@@ -246,6 +278,72 @@ std::vector<vk::ImageView> MultiRender::createSwapchainImageViews()
 	}
 
 	return views;
+}
+
+vk::RenderPass MultiRender::createRenderPass(vk::Device device)
+{
+
+	vk::RenderPassCreateInfo info;
+	vk::AttachmentDescription attachment_desc;
+	attachment_desc.setSamples(vk::SampleCountFlagBits::e1)
+		.setLoadOp(vk::AttachmentLoadOp::eClear)
+		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+		.setFormat(swapchainRequiredInfo_.format.format)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+	info.setAttachments(attachment_desc);
+
+	vk::SubpassDescription subpass_desc;
+	vk::AttachmentReference refer;
+	refer.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+	refer.setAttachment(0);
+	subpass_desc.setColorAttachments(refer);
+	subpass_desc.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
+
+	info.setSubpasses(subpass_desc);
+
+	return device.createRenderPass(info);
+}
+
+std::vector<vk::Framebuffer> MultiRender::createFrameBuffers(vk::Device device, vk::RenderPass render_pass)
+{
+	// 对于每个imageview 创建framebuffer
+	std::vector<vk::Framebuffer> result;
+
+	for (int i = 0; i < swapchain_.imageViews.size(); i++)
+	{
+		vk::FramebufferCreateInfo info;
+		info.setRenderPass(render_pass);
+		info.setLayers(1);
+		info.setWidth(swapchainRequiredInfo_.extent.width);
+		info.setHeight(swapchainRequiredInfo_.extent.height);
+		info.setAttachments(swapchain_.imageViews[i]);
+
+		result.push_back(device.createFramebuffer(info));
+	}
+	return result;
+}
+
+vk::CommandPool MultiRender::createCommandPool(vk::Device device, vk::CommandPoolCreateFlagBits flags, uint32_t index)
+{
+	vk::CommandPoolCreateInfo info;
+	info.setFlags(flags);
+	info.setQueueFamilyIndex(index);
+
+	return device.createCommandPool(info);
+}
+
+vk::CommandBuffer MultiRender::createCommandBuffer(vk::Device device, vk::CommandPool command_pool)
+{
+	vk::CommandBufferAllocateInfo info;
+	info.setCommandPool(command_pool);
+	info.setCommandBufferCount(1);
+	info.setLevel(vk::CommandBufferLevel::ePrimary);
+
+	//TODO 注意command buffer
+	return device.allocateCommandBuffers(info)[0];
 }
 
 RAII::QueueFamilyIndices MultiRender::queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device)

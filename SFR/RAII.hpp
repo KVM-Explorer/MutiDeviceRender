@@ -9,6 +9,22 @@ namespace RAII
 		std::optional<uint32_t> presentIndices;
 		std::optional<uint32_t> computerIndices;
 	};
+	struct Descriptor
+	{
+		vk::Image image;
+		vk::Buffer buffer;
+
+		vk::DescriptorSetLayout descriptorSetLayout;
+		std::vector<vk::DescriptorSet> descriptorSet;
+		vk::DescriptorPool descriptorPool;
+	};
+	struct Pipeline
+	{
+		vk::PipelineLayout pipelineLayout;
+		vk::CommandPool commandPool;
+		vk::CommandBuffer commandBuffer;
+		vk::Fence fence;
+	};
 
 	struct Device
 	{
@@ -19,6 +35,9 @@ namespace RAII
 		vk::Queue computerQueue;
 		vk::Queue presentQueue;
 		vk::RenderPass renderPass;
+		std::vector<vk::Framebuffer> frameBuffer;
+		Pipeline computerPipeline;
+		Pipeline graphicPipeline;
 	};
 
 	struct SwapChain
@@ -53,18 +72,6 @@ namespace RAII
 		vk::ImageView imageView;
 		vk::DescriptorImageInfo descriptor;
 	};
-
-	struct Computer
-	{
-		std::vector<vk::DescriptorSet> descriptorSet;
-		vk::DescriptorSetLayout descriptorSetLayout;
-		vk::DescriptorPool descriptorPool;
-		vk::PipelineLayout pipelineLayout;
-		vk::CommandPool commandPool;
-		vk::CommandBuffer commandBuffer;
-		vk::Fence fence;
-	};
-
 	//struct Graphics
 	//{
 	//	vk::DescriptorSetLayout descriptorSetLayout;
@@ -87,4 +94,7 @@ namespace RAII
 	//		device.destroyDescriptorSetLayout(descriptorSetLayout);
 	//	}
 	//};
+	
+
+	
 }
