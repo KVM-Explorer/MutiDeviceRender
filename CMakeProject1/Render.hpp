@@ -12,7 +12,6 @@
 #include <exception>
 #include <numeric>
 
-
 #undef max
 
 class Render

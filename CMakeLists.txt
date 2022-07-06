@@ -7,3 +7,4 @@ project ("CMakeProject1")
 
 # 包含子项目。
 add_subdirectory ("CMakeProject1")
+add_subdirectory("SFR")
