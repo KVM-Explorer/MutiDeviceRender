@@ -387,7 +387,7 @@ void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 	vk::ClearColorValue clear_color(std::array<float,4>{0.1f,0.1f,0.1f,1.f});
 	vk::ClearValue value(clear_color);
 	render_pass_begin_info.setRenderPass(renderPass_)
-		.setRenderArea(vk::Rect2D({0,0}, requiredInfo_.extent))
+		.setRenderArea(vk::Rect2D({200,0},{600,600}))
 		.setClearValues(value)
 		.setFramebuffer(framebuffer);
 
