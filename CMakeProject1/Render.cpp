@@ -329,7 +329,7 @@ vk::RenderPass Render::createRenderPass()
 	refer.setAttachment(0);
 	subpass_desc.setColorAttachments(refer);
 	subpass_desc.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
-
+	
 	info.setSubpasses(subpass_desc);
 
 	return device_.createRenderPass(info);
@@ -387,7 +387,7 @@ void Render::recordCommand(vk::CommandBuffer buffer,vk::Framebuffer framebuffer)
 	vk::ClearColorValue clear_color(std::array<float,4>{0.1f,0.1f,0.1f,1.f});
 	vk::ClearValue value(clear_color);
 	render_pass_begin_info.setRenderPass(renderPass_)
-		.setRenderArea(vk::Rect2D({ 0,0 }, requiredInfo_.extent))
+		.setRenderArea(vk::Rect2D({0,0}, requiredInfo_.extent))
 		.setClearValues(value)
 		.setFramebuffer(framebuffer);
 
