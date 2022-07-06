@@ -6,6 +6,46 @@
 		throw std::runtime_error(#expr "is nullptr"); \
 	}
 
+struct Vertex {
+	glm::vec2 position;
+	glm::vec3 color;
+
+	static vk::VertexInputBindingDescription getBindingDescription()
+	{
+		vk::VertexInputBindingDescription descripotion;
+		descripotion.setBinding(0)
+			.setInputRate(vk::VertexInputRate::eVertex)	// draw a vertex then to next or  draw a primitives then next
+			.setStride(sizeof(Vertex)); // ¶¥µãµÄsize
+
+		return descripotion;
+	}
+	static auto getAttrDescription()
+	{
+		static std::array<vk::VertexInputAttributeDescription, 2> description;
+		description[0].setLocation(0)
+			.setLocation(0)
+			.setFormat(vk::Format::eR32G32Sfloat)
+			.setOffset(offsetof(Vertex, position));
+		description[1].setLocation(1)
+			.setBinding(0)
+			.setFormat(vk::Format::eR32G32B32Sfloat)
+			.setOffset(offsetof(Vertex, color));
+		return description;
+	}
+};
+
+std::array nodes{
+   Vertex{{-0.5,-0.5},{1,0,0}},
+   Vertex{{-0.5,0.5},{0,1,0} },
+   Vertex{{0.5,0.5},{0,0,1}},
+
+
+   Vertex{{0.5,-0.5},{1,0,0}},
+   Vertex{{-0.5,-0.5},{0,1,0} },
+   Vertex{{0.5,0.5},{0,0,1}},
+};
+
+
 void MultiRender::init(GLFWwindow* window)
 {
 	// Instance
@@ -70,14 +110,17 @@ void MultiRender::init(GLFWwindow* window)
 	//dGPU_.graphicPipeline.presentAvaliableSemaphore = createSemaphore(dGPU_.device);
 	dGPU_.graphicPipeline.fence = createFence(dGPU_.device);
 
-	
+	createVertexBuffer(iGPU_);
+	//createVertexBuffer(dGPU_);
+
 
 
 }
 
 void MultiRender::release()
 {
-
+	iGPU_.device.freeMemory(vertex_.memory);
+	iGPU_.device.destroyBuffer(vertex_.buffer);
 	// semaphore
 	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.presentAvaliableSemaphore);
 	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.imageAvaliableSemaphore);
@@ -379,6 +422,43 @@ vk::Fence MultiRender::createFence(vk::Device device)
 	return device.createFence(info);
 }
 
+void MultiRender::createVertexBuffer(RAII::Device device)
+{
+	vertex_.buffer = createBuffer(device,vk::BufferUsageFlagBits::eVertexBuffer);
+	vertex_.memory = allocateMemory(device,vertex_.buffer);
+
+	CHECK_NULL(vertex_.buffer)
+	CHECK_NULL(vertex_.memory)
+
+	device.device.bindBufferMemory(vertex_.buffer, vertex_.memory, 0);
+
+	void* data = device.device.mapMemory(vertex_.memory, 0, sizeof(nodes));
+	memcpy(data, nodes.data(), sizeof(nodes));
+	device.device.unmapMemory(vertex_.memory);
+}
+
+vk::DeviceMemory MultiRender::allocateMemory(RAII::Device device, vk::Buffer buffer)
+{
+	auto requirement = queryBufferMemRequiredInfo(device,buffer,
+		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+	vk::MemoryAllocateInfo info;
+	info.setAllocationSize(requirement.size)
+		.setMemoryTypeIndex(requirement.index);
+	return device.device.allocateMemory(info);
+}
+
+vk::Buffer MultiRender::createBuffer(RAII::Device device, vk::BufferUsageFlags flags)
+{
+	vk::BufferCreateInfo info;
+	info.setSharingMode(vk::SharingMode::eExclusive)
+		.setQueueFamilyIndices(device.queueIndices.graphicsIndices.value())
+		.setSize(sizeof(nodes))
+		.setUsage(flags);
+
+	return device.device.createBuffer(info);
+}
+
 RAII::QueueFamilyIndices MultiRender::queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device)
 {
 
@@ -441,6 +521,24 @@ RAII::SwapChainRequiredInfo MultiRender::querySwapChainRequiredInfo(uint32_t w, 
 		}
 	}
 
+	return info;
+}
+
+RAII::MemRequiredInfo MultiRender::queryBufferMemRequiredInfo(RAII::Device device, vk::Buffer buffer, vk::MemoryPropertyFlags flags)
+{
+	RAII::MemRequiredInfo info;
+	auto properties = device.physicalDevice.getMemoryProperties();
+	auto requirement = device.device.getBufferMemoryRequirements(buffer);
+	info.size = requirement.size;
+
+	for (int i = 0; i < properties.memoryTypeCount; i++)
+	{
+		if ((requirement.memoryTypeBits & (1 << i)) &&
+			(properties.memoryTypes[i].propertyFlags & (flags)))
+		{
+			info.index = i;
+		}
+	}
 	return info;
 }
 

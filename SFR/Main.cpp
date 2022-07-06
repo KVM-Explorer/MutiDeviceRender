@@ -7,7 +7,6 @@
 
 #include <iostream>
 #include "MultiRender.hpp"
-//#include "test.hpp"
 
 int main() {
 

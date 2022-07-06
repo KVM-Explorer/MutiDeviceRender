@@ -24,6 +24,7 @@ private:
 	RAII::Device dGPU_;
 	RAII::SwapChainRequiredInfo swapchainRequiredInfo_;
 	RAII::SwapChain swapchain_;
+	RAII::Descriptor vertex_;
 	
 
 private:
@@ -43,6 +44,13 @@ private:
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
 
+	// Descriptor
+	void createVertexBuffer(RAII::Device device);
+	vk::DeviceMemory allocateMemory(RAII::Device device, vk::Buffer buffer);
+	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
+
+
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
+	RAII::MemRequiredInfo queryBufferMemRequiredInfo(RAII::Device device, vk::Buffer buffer, vk::MemoryPropertyFlags flags);
 };

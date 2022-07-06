@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
 #include <optional>
+#include <glm/glm.hpp>
 namespace RAII
 {
 	struct QueueFamilyIndices
@@ -13,6 +14,7 @@ namespace RAII
 	{
 		vk::Image image;
 		vk::Buffer buffer;
+		vk::DeviceMemory memory;
 
 		vk::DescriptorSetLayout descriptorSetLayout;
 		std::vector<vk::DescriptorSet> descriptorSet;
@@ -96,7 +98,6 @@ namespace RAII
 	//		device.destroyDescriptorSetLayout(descriptorSetLayout);
 	//	}
 	//};
-	
 
 	
 }

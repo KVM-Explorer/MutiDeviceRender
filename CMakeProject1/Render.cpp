@@ -78,9 +78,6 @@ std::array vertices{
 	if(!(expr))			\
 		throw std::runtime_error(#expr "is nullptr");
 
-//std::array vertices{
-//	Vertex
-//}
 
 void Render::init(GLFWwindow* window)
 {
