@@ -19,8 +19,8 @@ void MultiRender::init(GLFWwindow* window)
 	CHECK_NULL(iGPU_.physicalDevice)
 	CHECK_NULL(dGPU_.physicalDevice)
 	// Logic GPU
-	iGPU_.queueIndices = queryPhysicalDevice(iGPU_.physicalDevice);
-	dGPU_.queueIndices = queryPhysicalDevice(dGPU_.physicalDevice);
+	iGPU_.queueIndices = queryPhysicalDeviceQueue(iGPU_.physicalDevice);
+	dGPU_.queueIndices = queryPhysicalDeviceQueue(dGPU_.physicalDevice);
 
 	iGPU_.device = createDevice(iGPU_);
 	dGPU_.device = createDevice(dGPU_);
@@ -30,12 +30,15 @@ void MultiRender::init(GLFWwindow* window)
 	// create Command Queue
 	createQueue();
 
+	// ceate Swap chain
 	int w, h;
 	glfwGetWindowSize(window, &w, &h);
 	swapchainRequiredInfo_ = querySwapChainRequiredInfo(w, h);
+	swapchain_.swapchain = createSwapchain();
+	swapchain_.images = iGPU_.device.getSwapchainImagesKHR(swapchain_.swapchain);
+	swapchain_.imageViews = createSwapchainImageViews();
 
-
-
+	
 
 
 	
@@ -43,8 +46,11 @@ void MultiRender::init(GLFWwindow* window)
 
 void MultiRender::release()
 {
-
-	iGPU_.device.destroySwapchainKHR(swapchain_);
+	for(auto &view:swapchain_.imageViews)
+	{
+		iGPU_.device.destroyImageView(view);
+	}
+	iGPU_.device.destroySwapchainKHR(swapchain_.swapchain);
 	iGPU_.device.destroy();
 	dGPU_.device.destroy();
 	instance_.destroySurfaceKHR(surface_);
@@ -193,13 +199,18 @@ vk::SwapchainKHR MultiRender::createSwapchain()
 
 	if (iGPU_.queueIndices.graphicsIndices.value() == iGPU_.queueIndices.presentIndices.value())
 	{
-		info.setQueueFamilyIndices(iGPU_.queueIndices.graphicsIndices.value());
-		info.setImageSharingMode(vk::SharingMode::eConcurrent);	// span different device
+		std::array<uint32_t, 1> indices{
+			iGPU_.queueIndices.graphicsIndices.value(),
+		};
+		info.setQueueFamilyIndices(indices);
+		info.setImageSharingMode(vk::SharingMode::eExclusive);	// span different device
 	}
 	else
 	{
-		std::array<uint32_t, 2> indices{ iGPU_.queueIndices.graphicsIndices.value(),
-									iGPU_.queueIndices.presentIndices.value() };
+		std::array<uint32_t, 2> indices{
+			iGPU_.queueIndices.graphicsIndices.value(),
+			iGPU_.queueIndices.presentIndices.value(),
+		};
 		info.setQueueFamilyIndices(indices);
 		info.setImageSharingMode(vk::SharingMode::eConcurrent);	// 队列不同，并行存储
 	}
@@ -212,7 +223,32 @@ vk::SwapchainKHR MultiRender::createSwapchain()
 	return iGPU_.device.createSwapchainKHR(info);
 }
 
-RAII::QueueFamilyIndices MultiRender::queryPhysicalDevice(vk::PhysicalDevice physical_device)
+std::vector<vk::ImageView> MultiRender::createSwapchainImageViews()
+{
+	std::vector<vk::ImageView> views(swapchain_.images.size());
+	for (int i = 0; i < views.size(); i++)
+	{
+		vk::ImageViewCreateInfo info;
+		info.setImage(swapchain_.images[i])
+			.setFormat(swapchainRequiredInfo_.format.format)
+			.setViewType(vk::ImageViewType::e2D);
+		vk::ImageSubresourceRange range;
+		range.setBaseMipLevel(0)
+			.setLevelCount(1)
+			.setLayerCount(1)
+			.setBaseArrayLayer(0)
+			.setAspectMask(vk::ImageAspectFlagBits::eColor);
+		info.setSubresourceRange(range);
+		vk::ComponentMapping mapping;
+		info.setComponents(mapping);
+
+		views[i] = iGPU_.device.createImageView(info);
+	}
+
+	return views;
+}
+
+RAII::QueueFamilyIndices MultiRender::queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device)
 {
 
 	auto familes = physical_device.getQueueFamilyProperties();

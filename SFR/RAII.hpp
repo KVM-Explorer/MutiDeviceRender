@@ -18,7 +18,14 @@ namespace RAII
 		vk::Queue graphicsQueue;
 		vk::Queue computerQueue;
 		vk::Queue presentQueue;
+		vk::RenderPass renderPass;
+	};
 
+	struct SwapChain
+	{
+		vk::SwapchainKHR swapchain;
+		std::vector<vk::Image>	images;
+		std::vector<vk::ImageView> imageViews;
 	};
 
 
