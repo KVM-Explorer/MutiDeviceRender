@@ -133,42 +133,63 @@ void MultiRender::init(GLFWwindow* window)
 void MultiRender::release()
 {
 
-
-	iGPU_.device.destroyRenderPass(iGPU_.renderPass);
-	iGPU_.device.destroyPipelineLayout(iGPU_.graphicPipeline.pipelineLayout);
-	iGPU_.device.destroyPipeline(iGPU_.graphicPipeline.pipeline);
-	for(auto &shader:iGPU_.graphicPipeline.shaders)
-	{
-		iGPU_.device.destroyShaderModule(shader);
-	}
-	for(auto &shader:dGPU_.graphicPipeline.shaders)
-	{
-		dGPU_.device.destroyShaderModule(shader);
-	}
-	iGPU_.device.freeMemory(iGPU_.vertex.memory);
-	iGPU_.device.destroyBuffer(iGPU_.vertex.buffer);
-	// semaphore
-	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.presentAvaliableSemaphore);
-	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.imageAvaliableSemaphore);
-	iGPU_.device.destroyFence(iGPU_.graphicPipeline.fence);
-	dGPU_.device.destroySemaphore(dGPU_.graphicPipeline.imageAvaliableSemaphore);
-	dGPU_.device.destroyFence(dGPU_.graphicPipeline.fence);
-
+	// command buffer
 	iGPU_.device.freeCommandBuffers(iGPU_.graphicPipeline.commandPool, iGPU_.graphicPipeline.commandBuffer);
 	dGPU_.device.freeCommandBuffers(dGPU_.graphicPipeline.commandPool, dGPU_.graphicPipeline.commandBuffer);
 	iGPU_.device.destroyCommandPool(iGPU_.graphicPipeline.commandPool);
 	dGPU_.device.destroyCommandPool(dGPU_.graphicPipeline.commandPool);
-	for(auto &frame_buffer:iGPU_.frameBuffer)
+	// semaphore
+	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.presentAvaliableSemaphore);
+	iGPU_.device.destroySemaphore(iGPU_.graphicPipeline.imageAvaliableSemaphore);
+	iGPU_.device.destroyFence(iGPU_.graphicPipeline.fence);
+	dGPU_.device.destroySemaphore(dGPU_.graphicPipeline.presentAvaliableSemaphore);
+	dGPU_.device.destroySemaphore(dGPU_.graphicPipeline.imageAvaliableSemaphore);
+	dGPU_.device.destroyFence(dGPU_.graphicPipeline.fence);
+
+
+	for (auto& frame_buffer : iGPU_.frameBuffer)
 	{
 		iGPU_.device.destroyFramebuffer(frame_buffer);
 	}
+	
+	iGPU_.device.destroyPipeline(iGPU_.graphicPipeline.pipeline);
+	iGPU_.device.destroyPipelineLayout(iGPU_.graphicPipeline.pipelineLayout);
 	iGPU_.device.destroyRenderPass(iGPU_.renderPass);
+	for(auto &shader:iGPU_.graphicPipeline.shaders)
+	{
+		iGPU_.device.destroyShaderModule(shader);
+	}
+	iGPU_.device.freeMemory(iGPU_.vertex.memory);
+	iGPU_.device.destroyBuffer(iGPU_.vertex.buffer);
+
+	for (auto& frame_buffer : dGPU_.frameBuffer)
+	{
+		dGPU_.device.destroyFramebuffer(frame_buffer);
+	}
+	dGPU_.device.destroyPipeline(dGPU_.graphicPipeline.pipeline);
+	dGPU_.device.destroyPipelineLayout(dGPU_.graphicPipeline.pipelineLayout);
 	dGPU_.device.destroyRenderPass(dGPU_.renderPass);
+
+	for (auto& shader : dGPU_.graphicPipeline.shaders)
+	{
+		dGPU_.device.destroyShaderModule(shader);
+	}
+	dGPU_.device.freeMemory(dGPU_.vertex.memory);
+	dGPU_.device.destroyBuffer(dGPU_.vertex.buffer);
+
+
+	// swap chain
+	for (auto& view : dGPU_.swapchain.imageViews)
+	{
+		dGPU_.device.destroyImageView(view);
+	}
+	dGPU_.device.destroySwapchainKHR(dGPU_.swapchain.swapchain);
 	for(auto &view:iGPU_.swapchain.imageViews)
 	{
 		iGPU_.device.destroyImageView(view);
 	}
 	iGPU_.device.destroySwapchainKHR(iGPU_.swapchain.swapchain);
+
 	iGPU_.device.destroy();
 	dGPU_.device.destroy();
 	instance_.destroySurfaceKHR(surface_);
@@ -179,7 +200,7 @@ void MultiRender::render()
 {
 	// TODO computer shader
 
-	// Render
+	// iGPU Render
 	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
 	auto result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
@@ -218,6 +239,46 @@ void MultiRender::render()
 	{
 		throw std::runtime_error("Render wait fence failed");
 	}
+
+	// dGPU Render
+	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
+	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,	// TODO update
+		std::numeric_limits<uint64_t>::max(),
+		dGPU_.graphicPipeline.imageAvaliableSemaphore);
+	if (result.result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("acquire image failed");
+	}
+
+	image_index = result.value;
+
+	// draw
+	dGPU_.graphicPipeline.commandBuffer.reset();
+	recordCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.frameBuffer[image_index]);
+
+	flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	//submit_info;
+	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer)
+		.setSignalSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore)
+		.setWaitSemaphores(dGPU_.graphicPipeline.imageAvaliableSemaphore)
+		.setWaitDstStageMask(flags);
+	dGPU_.graphicsQueue.submit(submit_info, dGPU_.graphicPipeline.fence);
+	// present
+	//vk::PresentInfoKHR present_info;
+	present_info.setImageIndices(image_index)	// TODO update
+		.setSwapchains(dGPU_.swapchain.swapchain)
+		.setWaitSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore);
+
+	if (dGPU_.presentQueue.presentKHR(present_info) != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Render present failed");
+	}
+
+	if (dGPU_.device.waitForFences(dGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
+		vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Render wait fence failed");
+	}
 }
 
 void MultiRender::waitIdle()
@@ -250,7 +311,7 @@ vk::ShaderModule MultiRender::createShaderModule(const char* filename, int devic
 
 void MultiRender::createComputerPipeline(vk::ShaderModule computerShader)
 {
-	
+	// TODO
 }
 
 void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::ShaderModule frag_shader, int device_index)
@@ -476,6 +537,7 @@ void MultiRender::createQueue()
 
 	dGPU_.computerQueue = dGPU_.device.getQueue(dGPU_.queueIndices.computerIndices.value(), 0);
 	dGPU_.graphicsQueue= dGPU_.device.getQueue(dGPU_.queueIndices.graphicsIndices.value(), 0);
+	dGPU_.presentQueue = dGPU_.device.getQueue(dGPU_.queueIndices.presentIndices.value(),0);
 }
 
 vk::SwapchainKHR MultiRender::createSwapchain(vk::Device device, RAII::QueueFamilyIndices indies)
@@ -745,8 +807,7 @@ RAII::SwapChainRequiredInfo MultiRender::querySwapChainRequiredInfo(uint32_t w, 
 	info.format = formats[0];
 	for (auto& format : formats)
 	{
-		if (format.format == vk::Format::eR8G8B8A8Srgb ||
-			format.format == vk::Format::eB8G8R8A8Srgb)
+		if (format.format == vk::Format::eB8G8R8A8Srgb)
 		{
 			info.format = format;
 		}
