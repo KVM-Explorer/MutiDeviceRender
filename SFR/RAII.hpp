@@ -51,6 +51,7 @@ namespace RAII
 		Pipeline graphicPipeline;
 		SwapChain swapchain;
 		Descriptor vertex;
+		int index;
 	};
 
 	

@@ -126,7 +126,8 @@ void MultiRender::init(GLFWwindow* window)
 	createVertexBuffer(iGPU_);
 	createVertexBuffer(dGPU_);
 
-
+	iGPU_.index = 0;
+	dGPU_.index = 1;
 
 }
 
@@ -240,7 +241,8 @@ void MultiRender::render()
 		throw std::runtime_error("Render wait fence failed");
 	}
 
-	// dGPU Render
+	//-------------------------------------------- dGPU Render-----------------------------------------------------
+
 	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
 	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
@@ -382,8 +384,8 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 			swapchainRequiredInfo_.extent.width,
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
-		vk::Rect2D scissor({ 400,0 },
-			{ swapchainRequiredInfo_.extent.width - 400,
+		vk::Rect2D scissor({ 0,0 },
+			{ swapchainRequiredInfo_.extent.width,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
 			.setScissors(scissor);
@@ -410,7 +412,7 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
 		vk::Rect2D scissor({ 0,0 },
-			{ swapchainRequiredInfo_.extent.width - 400,
+			{ swapchainRequiredInfo_.extent.width,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
 			.setScissors(scissor);
@@ -694,12 +696,28 @@ void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk
 	vk::RenderPassBeginInfo render_pass_begin_info;
 	vk::ClearColorValue clear_color(std::array<float, 4>{0.1f, 0.1f, 0.1f, 1.f});
 	vk::ClearValue value(clear_color);
-	render_pass_begin_info.setRenderPass(device.renderPass)
-		.setRenderArea(vk::Rect2D(
-			{ 0,0 },
-			swapchainRequiredInfo_.extent))
-		.setClearValues(value)
-		.setFramebuffer(frame_buffer);
+	if(device.index ==0)
+	{
+		render_pass_begin_info.setRenderPass(device.renderPass)
+			.setRenderArea(vk::Rect2D(
+				{ 0,0 },
+				swapchainRequiredInfo_.extent
+				//{ 400,600 }
+			))
+			.setClearValues(value)
+			.setFramebuffer(frame_buffer);
+	}else
+	{
+		render_pass_begin_info.setRenderPass(device.renderPass)
+			.setRenderArea(vk::Rect2D(
+				{ 0,0 },
+				swapchainRequiredInfo_.extent
+				//{ 400,600 }
+			))
+			.setClearValues(value)
+			.setFramebuffer(frame_buffer);
+	}
+	
 
 	buffer.beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
 
