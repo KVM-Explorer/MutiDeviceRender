@@ -53,8 +53,16 @@ private:
 	vk::DeviceMemory allocateMemory(RAII::Device device, vk::Buffer buffer);
 	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
 
-
+	// Image
+	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlagBits flags);
+	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);;
+	// Query
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
 	RAII::MemRequiredInfo queryBufferMemRequiredInfo(RAII::Device device, vk::Buffer buffer, vk::MemoryPropertyFlags flags);
+	RAII::MemRequiredInfo queryImageMemRequiredInfo(RAII::Device device, vk::Image image, vk::MemoryPropertyFlags flags);
+	//transfer
+	void CopyImageGPUToGPU(RAII::Device &src,RAII::Device &dst);
+	void createTransferImage(RAII::Device &src);
+	
 };

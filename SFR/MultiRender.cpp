@@ -51,63 +51,63 @@ void MultiRender::init(GLFWwindow* window)
 	// Instance
 	instance_ = createInstance();
 	CHECK_NULL(instance_)
-	// Surface
-	surface_ = createSurface(window);
+		// Surface
+		surface_ = createSurface(window);
 	CHECK_NULL(surface_)
-	// physical GPU
-	createPhysicalDevice();
+		// physical GPU
+		createPhysicalDevice();
 	CHECK_NULL(iGPU_.physicalDevice)
-	CHECK_NULL(dGPU_.physicalDevice)
-	// Logic GPU
-	iGPU_.queueIndices = queryPhysicalDeviceQueue(iGPU_.physicalDevice);
+		CHECK_NULL(dGPU_.physicalDevice)
+		// Logic GPU
+		iGPU_.queueIndices = queryPhysicalDeviceQueue(iGPU_.physicalDevice);
 	dGPU_.queueIndices = queryPhysicalDeviceQueue(dGPU_.physicalDevice);
 
 	iGPU_.device = createDevice(iGPU_);
 	dGPU_.device = createDevice(dGPU_);
 	CHECK_NULL(iGPU_.device)
-	CHECK_NULL(dGPU_.device)
+		CHECK_NULL(dGPU_.device)
 
-	// create Command Queue
-	createQueue();
+		// create Command Queue
+		createQueue();
 
 	// ceate Swap chain
 	int w, h;
 	glfwGetWindowSize(window, &w, &h);
 	swapchainRequiredInfo_ = querySwapChainRequiredInfo(w, h);
-	iGPU_.swapchain.swapchain = createSwapchain(iGPU_.device,iGPU_.queueIndices);
+	iGPU_.swapchain.swapchain = createSwapchain(iGPU_.device, iGPU_.queueIndices);
 	iGPU_.swapchain.images = iGPU_.device.getSwapchainImagesKHR(iGPU_.swapchain.swapchain);
-	iGPU_.swapchain.imageViews = createSwapchainImageViews(iGPU_.device,iGPU_.swapchain);
+	iGPU_.swapchain.imageViews = createSwapchainImageViews(iGPU_.device, iGPU_.swapchain);
 	CHECK_NULL(iGPU_.swapchain.swapchain)
 
-	dGPU_.swapchain.swapchain = createSwapchain(dGPU_.device,dGPU_.queueIndices);
+		dGPU_.swapchain.swapchain = createSwapchain(dGPU_.device, dGPU_.queueIndices);
 	dGPU_.swapchain.images = dGPU_.device.getSwapchainImagesKHR(dGPU_.swapchain.swapchain);
 	dGPU_.swapchain.imageViews = createSwapchainImageViews(dGPU_.device, dGPU_.swapchain);
 	CHECK_NULL(dGPU_.swapchain.swapchain)
 
-	// Render Pass
-	iGPU_.renderPass = createRenderPass(iGPU_.device);
+		// Render Pass
+		iGPU_.renderPass = createRenderPass(iGPU_.device);
 	dGPU_.renderPass = createRenderPass(dGPU_.device);
-	
+
 	// Frame Buffer TODO Only iGPU
-	iGPU_.frameBuffer = createFrameBuffers(iGPU_.device,iGPU_.renderPass,iGPU_.swapchain);
-	dGPU_.frameBuffer = createFrameBuffers(dGPU_.device,dGPU_.renderPass,dGPU_.swapchain);
+	iGPU_.frameBuffer = createFrameBuffers(iGPU_.device, iGPU_.renderPass, iGPU_.swapchain);
+	dGPU_.frameBuffer = createFrameBuffers(dGPU_.device, dGPU_.renderPass, dGPU_.swapchain);
 
 	// CommandPool Command Buffer
-	
-	iGPU_.graphicPipeline.commandPool = createCommandPool(iGPU_.device,vk::CommandPoolCreateFlagBits::eResetCommandBuffer, 
+
+	iGPU_.graphicPipeline.commandPool = createCommandPool(iGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 		iGPU_.queueIndices.computerIndices.value());
 	CHECK_NULL(iGPU_.graphicPipeline.commandPool)
-	iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
+		iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(iGPU_.graphicPipeline.commandBuffer)
 
-	dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 			dGPU_.queueIndices.computerIndices.value());
 	CHECK_NULL(dGPU_.graphicPipeline.commandPool)
-	dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
+		dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(dGPU_.graphicPipeline.commandBuffer)
 
-	// Semaphore include semaphore and fence
-	iGPU_.graphicPipeline.imageAvaliableSemaphore = createSemaphore(iGPU_.device);
+		// Semaphore include semaphore and fence
+		iGPU_.graphicPipeline.imageAvaliableSemaphore = createSemaphore(iGPU_.device);
 	iGPU_.graphicPipeline.presentAvaliableSemaphore = createSemaphore(iGPU_.device);
 	iGPU_.graphicPipeline.fence = createFence(iGPU_.device);
 
@@ -118,21 +118,45 @@ void MultiRender::init(GLFWwindow* window)
 	// PipelineLayout
 	iGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(iGPU_);
 	CHECK_NULL(iGPU_.graphicPipeline.pipelineLayout)
-	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_);
+		dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_);
 	CHECK_NULL(dGPU_.graphicPipeline.pipelineLayout)
 
 
-	// Vertex
-	createVertexBuffer(iGPU_);
+		// Vertex
+		createVertexBuffer(iGPU_);
 	createVertexBuffer(dGPU_);
 
 	iGPU_.index = 0;
 	dGPU_.index = 1;
 
+	// Tmp Image to swap GPU-GPU
+	vk::Extent3D extent = {
+		swapchainRequiredInfo_.extent.width,
+		swapchainRequiredInfo_.extent.height,
+		1
+	};
+	iGPU_.mappingImage = createImage(iGPU_.device, extent,
+		vk::Format::eB8G8R8A8Srgb,vk::ImageUsageFlagBits::eTransferDst);
+	iGPU_.mappingMemory = allocateImageMemory(iGPU_,
+		vk::MemoryPropertyFlagBits::eHostVisible |
+		vk::MemoryPropertyFlagBits::eHostCoherent,
+		iGPU_.mappingImage);
+	dGPU_.mappingImage = createImage(dGPU_.device, extent,
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst);
+	dGPU_.mappingMemory = allocateImageMemory(dGPU_, 
+		vk::MemoryPropertyFlagBits::eHostVisible |
+		vk::MemoryPropertyFlagBits::eHostCoherent, 
+		dGPU_.mappingImage);
 }
 
 void MultiRender::release()
 {
+
+	// Mapping Image and Memory
+	iGPU_.device.freeMemory(iGPU_.mappingMemory);
+	iGPU_.device.destroyImage(iGPU_.mappingImage);
+	dGPU_.device.freeMemory(dGPU_.mappingMemory);
+	dGPU_.device.destroyImage(dGPU_.mappingImage);
 
 	// command buffer
 	iGPU_.device.freeCommandBuffers(iGPU_.graphicPipeline.commandPool, iGPU_.graphicPipeline.commandBuffer);
@@ -200,10 +224,11 @@ void MultiRender::release()
 void MultiRender::render()
 {
 	// TODO computer shader
+	vk::ResultValue<uint32_t> result{ vk::Result::eErrorUnknown,0 };
 
 	// iGPU Render
 	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
-	auto result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
+	result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
 		iGPU_.graphicPipeline.imageAvaliableSemaphore);
 	if (result.result != vk::Result::eSuccess)
@@ -215,9 +240,8 @@ void MultiRender::render()
 
 	// draw
 	iGPU_.graphicPipeline.commandBuffer.reset();
-	recordCommand(iGPU_,iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[image_index]);	
-
-	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	recordCommand(iGPU_,iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[image_index]);
+	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput ;
 	vk::SubmitInfo submit_info;
 	submit_info.setCommandBuffers(iGPU_.graphicPipeline.commandBuffer)
 		.setSignalSemaphores(iGPU_.graphicPipeline.presentAvaliableSemaphore)
@@ -240,9 +264,9 @@ void MultiRender::render()
 	{
 		throw std::runtime_error("Render wait fence failed");
 	}
-
+	
 	//-------------------------------------------- dGPU Render-----------------------------------------------------
-
+	
 	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
 	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
@@ -252,14 +276,18 @@ void MultiRender::render()
 		throw std::runtime_error("acquire image failed");
 	}
 
+	//uint32_t image_index = result.value;
 	image_index = result.value;
 
 	// draw
 	dGPU_.graphicPipeline.commandBuffer.reset();
+	
 	recordCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.frameBuffer[image_index]);
 
+	//vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	//submit_info;
+	//vk::SubmitInfo submit_info;
 	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer)
 		.setSignalSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore)
 		.setWaitSemaphores(dGPU_.graphicPipeline.imageAvaliableSemaphore)
@@ -281,6 +309,7 @@ void MultiRender::render()
 	{
 		throw std::runtime_error("Render wait fence failed");
 	}
+	
 }
 
 void MultiRender::waitIdle()
@@ -385,7 +414,7 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
 		vk::Rect2D scissor({ 0,0 },
-			{ swapchainRequiredInfo_.extent.width,
+			{ swapchainRequiredInfo_.extent.width/2,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
 			.setScissors(scissor);
@@ -407,12 +436,12 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 		info.setLayout(dGPU_.graphicPipeline.pipelineLayout);
 		// TODO viewport and scissor
 		vk::PipelineViewportStateCreateInfo viewport_state;
-		vk::Viewport viewport(0, 0,
-			swapchainRequiredInfo_.extent.width,
+		vk::Viewport viewport(400, 0,
+			swapchainRequiredInfo_.extent.width/2,
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
-		vk::Rect2D scissor({ 0,0 },
-			{ swapchainRequiredInfo_.extent.width,
+		vk::Rect2D scissor({ 400,0 },
+			{ swapchainRequiredInfo_.extent.width/2,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
 			.setScissors(scissor);
@@ -447,10 +476,11 @@ vk::Instance MultiRender::createInstance()
 		extensions[i] = ext_array[i];
 	}
 	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
 	std::cout << "Layer Name:" << std::endl;
 
-	std::array<const char*, 1> layers{ "VK_LAYER_KHRONOS_validation" };
+	std::array<const char*, 1> layers{
+		"VK_LAYER_KHRONOS_validation"
+	};
 	auto layer_names = vk::enumerateInstanceLayerProperties();
 	for (auto& layer : layer_names)
 	{
@@ -528,7 +558,7 @@ vk::Device MultiRender::createDevice(RAII::Device& device)
 
 	info.setQueueCreateInfos(queue_infos);
 	info.setPEnabledExtensionNames(extensions);
-
+	
 	return device.physicalDevice.createDevice(info);
 }
 
@@ -545,7 +575,6 @@ void MultiRender::createQueue()
 vk::SwapchainKHR MultiRender::createSwapchain(vk::Device device, RAII::QueueFamilyIndices indies)
 {
 	vk::SwapchainCreateInfoKHR info;
-	
 	info.setImageColorSpace(swapchainRequiredInfo_.format.colorSpace)
 		.setImageFormat(swapchainRequiredInfo_.format.format)
 		.setMinImageCount(swapchainRequiredInfo_.imageCount)
@@ -575,8 +604,6 @@ vk::SwapchainKHR MultiRender::createSwapchain(vk::Device device, RAII::QueueFami
 	info.setImageArrayLayers(1);	// Í¼²ã
 	info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);	// ²»Í¸Ã÷
 	info.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
-
-	
 	return device.createSwapchainKHR(info);
 }
 
@@ -645,7 +672,7 @@ std::vector<vk::Framebuffer> MultiRender::createFrameBuffers(vk::Device device, 
 		info.setWidth(swapchainRequiredInfo_.extent.width);
 		info.setHeight(swapchainRequiredInfo_.extent.height);
 		info.setAttachments(swapchain.imageViews[i]);
-
+		
 		result.push_back(device.createFramebuffer(info));
 	}
 	return result;
@@ -686,9 +713,10 @@ vk::Fence MultiRender::createFence(vk::Device device)
 
 void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame_buffer)
 {
+
 	vk::CommandBufferBeginInfo begin_info;
 	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-
+	
 	if (buffer.begin(&begin_info) != vk::Result::eSuccess)
 	{
 		throw std::runtime_error("command buffer record failed");
@@ -701,8 +729,8 @@ void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk
 		render_pass_begin_info.setRenderPass(device.renderPass)
 			.setRenderArea(vk::Rect2D(
 				{ 0,0 },
-				swapchainRequiredInfo_.extent
-				//{ 400,600 }
+				//swapchainRequiredInfo_.extent
+				{ 800,300 }
 			))
 			.setClearValues(value)
 			.setFramebuffer(frame_buffer);
@@ -728,7 +756,7 @@ void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk
 
 
 	buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, device.graphicPipeline.pipeline);
-
+	
 	vk::DeviceSize size = 0;
 	buffer.bindVertexBuffers(0, device.vertex.buffer, size);
 
@@ -770,7 +798,6 @@ vk::DeviceMemory MultiRender::allocateMemory(RAII::Device device, vk::Buffer buf
 {
 	auto requirement = queryBufferMemRequiredInfo(device,buffer,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-
 	vk::MemoryAllocateInfo info;
 	info.setAllocationSize(requirement.size)
 		.setMemoryTypeIndex(requirement.index);
@@ -786,6 +813,33 @@ vk::Buffer MultiRender::createBuffer(RAII::Device device, vk::BufferUsageFlags f
 		.setUsage(flags);
 
 	return device.device.createBuffer(info);
+}
+
+vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::Format format, vk::ImageUsageFlagBits flags)
+{
+	vk::ImageCreateInfo info;
+
+	info.setFormat(format)
+		.setImageType(vk::ImageType::e2D)
+		.setSharingMode(vk::SharingMode::eExclusive)
+		.setTiling(vk::ImageTiling::eLinear)
+		.setExtent(extent)
+		.setArrayLayers(1)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setMipLevels(1)
+		.setSamples(vk::SampleCountFlagBits::e1)
+		.setUsage(flags);
+
+	return device.createImage(info);
+}
+
+vk::DeviceMemory MultiRender::allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image)
+{
+	vk::MemoryAllocateInfo info;
+	auto requirements = queryImageMemRequiredInfo(device, image, flags);
+	info.setMemoryTypeIndex(requirements.index)
+		.setAllocationSize(requirements.size);
+	return device.device.allocateMemory(info);
 }
 
 RAII::QueueFamilyIndices MultiRender::queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device)
@@ -823,6 +877,8 @@ RAII::SwapChainRequiredInfo MultiRender::querySwapChainRequiredInfo(uint32_t w, 
 	info.capabilities = iGPU_.physicalDevice.getSurfaceCapabilitiesKHR(surface_);
 	auto formats = iGPU_.physicalDevice.getSurfaceFormatsKHR(surface_);
 	info.format = formats[0];
+	auto support_usage = info.capabilities.supportedUsageFlags;
+	
 	for (auto& format : formats)
 	{
 		if (format.format == vk::Format::eB8G8R8A8Srgb)
@@ -868,6 +924,35 @@ RAII::MemRequiredInfo MultiRender::queryBufferMemRequiredInfo(RAII::Device devic
 		}
 	}
 	return info;
+}
+
+RAII::MemRequiredInfo MultiRender::queryImageMemRequiredInfo(RAII::Device device, vk::Image image, vk::MemoryPropertyFlags flags)
+{
+	RAII::MemRequiredInfo info;
+	auto properties = device.physicalDevice.getMemoryProperties();
+	auto requirement = device.device.getImageMemoryRequirements(image);
+	info.size = requirement.size;
+
+	for (int i = 0; i < properties.memoryTypeCount; i++)
+	{
+		if ((requirement.memoryTypeBits & (1 << i)) &&
+			(properties.memoryTypes[i].propertyFlags & (flags)))
+		{
+			info.index = i;
+		}
+	}
+	return info;
+}
+
+void MultiRender::CopyImageGPUToGPU(RAII::Device& src, RAII::Device& dst)
+{
+	// TODO NOW
+}
+// Copy Swap Chain image to buffer
+void MultiRender::createTransferImage(RAII::Device &src)
+{
+	
+
 }
 
 

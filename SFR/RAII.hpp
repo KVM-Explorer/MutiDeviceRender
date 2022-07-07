@@ -52,6 +52,8 @@ namespace RAII
 		SwapChain swapchain;
 		Descriptor vertex;
 		int index;
+		vk::Image mappingImage;
+		vk::DeviceMemory mappingMemory;
 	};
 
 	
