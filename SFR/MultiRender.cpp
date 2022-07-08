@@ -55,11 +55,11 @@ void MultiRender::init(GLFWwindow* window)
 		surface_ = createSurface(window);
 	CHECK_NULL(surface_)
 		// physical GPU
-		createPhysicalDevice();
+	createPhysicalDevice();
 	CHECK_NULL(iGPU_.physicalDevice)
-		CHECK_NULL(dGPU_.physicalDevice)
+	CHECK_NULL(dGPU_.physicalDevice)
 		// Logic GPU
-		iGPU_.queueIndices = queryPhysicalDeviceQueue(iGPU_.physicalDevice);
+	iGPU_.queueIndices = queryPhysicalDeviceQueue(iGPU_.physicalDevice);
 	dGPU_.queueIndices = queryPhysicalDeviceQueue(dGPU_.physicalDevice);
 
 	iGPU_.device = createDevice(iGPU_);
@@ -123,7 +123,7 @@ void MultiRender::init(GLFWwindow* window)
 
 
 		// Vertex
-		createVertexBuffer(iGPU_);
+	createVertexBuffer(iGPU_);
 	createVertexBuffer(dGPU_);
 
 	iGPU_.index = 0;
@@ -141,12 +141,20 @@ void MultiRender::init(GLFWwindow* window)
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent,
 		iGPU_.mappingImage);
+	iGPU_.device.bindImageMemory(iGPU_.mappingImage, iGPU_.mappingMemory,0);
+
 	dGPU_.mappingImage = createImage(dGPU_.device, extent,
 		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst);
 	dGPU_.mappingMemory = allocateImageMemory(dGPU_, 
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent, 
 		dGPU_.mappingImage);
+	dGPU_.device.bindImageMemory(dGPU_.mappingImage, dGPU_.mappingMemory, 0);
+
+
+	// query support copy method
+	querySupportBlit(iGPU_);
+	querySupportBlit(dGPU_);
 }
 
 void MultiRender::release()
@@ -513,7 +521,6 @@ void MultiRender::createPhysicalDevice()
 	{
 		auto dproperty = device.getProperties();
 		auto features = device.getFeatures();
-		
 	}
 	// TODO ≈‰÷√∂‡…Ë±∏
 	iGPU_.physicalDevice = phycial_device[0];
@@ -824,7 +831,7 @@ vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::F
 		.setSharingMode(vk::SharingMode::eExclusive)
 		.setTiling(vk::ImageTiling::eLinear)
 		.setExtent(extent)
-		.setArrayLayers(1)
+		.setArrayLayers(0)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setMipLevels(1)
 		.setSamples(vk::SampleCountFlagBits::e1)
@@ -944,15 +951,75 @@ RAII::MemRequiredInfo MultiRender::queryImageMemRequiredInfo(RAII::Device device
 	return info;
 }
 
-void MultiRender::CopyImageGPUToGPU(RAII::Device& src, RAII::Device& dst)
+void MultiRender::querySupportBlit(RAII::Device& device)
 {
-	// TODO NOW
-}
-// Copy Swap Chain image to buffer
-void MultiRender::createTransferImage(RAII::Device &src)
-{
-	
 
+	vk::FormatProperties format_properties;
+	// Check if the device supports blitting from optimal images (the swapchain images are in optimal format)
+	device.physicalDevice.getFormatProperties(vk::Format::eB8G8R8A8Srgb, &format_properties);
+	if(!(format_properties.linearTilingFeatures & vk::FormatFeatureFlagBits::eBlitSrc))
+	{
+		std::cout << "Device doesn't support blitting from optimal tiled images, using copy instead of blit" << std::endl;
+		device.isSupportsBlit = false;
+	}
+	if(!(format_properties.linearTilingFeatures & vk::FormatFeatureFlagBits::eBlitDst))
+	{
+		std::cout << "Device doesn't support blitting from optimal tiled images, using copy instead of blit" << std::endl;
+		device.isSupportsBlit = false;
+	}
+}
+
+
+void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src_index)
+{
+	// Add Image Memory Barrier
+
+	insertImageMemoryBarrier(src,
+	                         src.mappingImage,
+							 vk::AccessFlagBits::eNone,
+	                         vk::AccessFlagBits::eTransferWrite,
+	                         vk::ImageLayout::eUndefined,
+	                         vk::ImageLayout::eTransferDstOptimal,
+	                         vk::PipelineStageFlagBits::eTransfer,
+	                         vk::PipelineStageFlagBits::eTransfer);
+	insertImageMemoryBarrier(src,
+		src.swapchain.images[src_index],
+		vk::AccessFlagBits::eMemoryRead,
+		vk::AccessFlagBits::eTransferRead,
+		vk::ImageLayout::ePresentSrcKHR,
+		vk::ImageLayout::eTransferSrcOptimal,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+
+	// Copy Image src Device to src host visable
+
+	// Copy Image src host to dst host
+
+	// Copy Image dst host to dst Device
+
+}
+
+vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device,
+	vk::Image image,
+	vk::AccessFlags src_access,
+	vk::AccessFlags dst_access,
+	vk::ImageLayout old_layout,
+	vk::ImageLayout new_layout,
+	vk::PipelineStageFlags src_mask,
+	vk::PipelineStageFlags dst_mask)
+															 
+{
+	vk::ImageMemoryBarrier barrier;
+	barrier.setOldLayout(old_layout)
+		.setNewLayout(new_layout)
+		.setSrcAccessMask(src_access)
+		.setDstAccessMask(dst_access)
+		.setSubresourceRange({ vk::ImageAspectFlagBits::eColor,0,1,0,1 })
+		.setImage(image);
+
+
+	device.graphicPipeline.commandBuffer.pipelineBarrier(src_mask, dst_mask,vk::DependencyFlagBits::eByRegion, 0, nullptr, 0, nullptr, 1, &barrier);
+	return barrier;
 }
 
 

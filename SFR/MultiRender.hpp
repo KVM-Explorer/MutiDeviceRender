@@ -61,8 +61,16 @@ private:
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
 	RAII::MemRequiredInfo queryBufferMemRequiredInfo(RAII::Device device, vk::Buffer buffer, vk::MemoryPropertyFlags flags);
 	RAII::MemRequiredInfo queryImageMemRequiredInfo(RAII::Device device, vk::Image image, vk::MemoryPropertyFlags flags);
-	//transfer
-	void CopyImageGPUToGPU(RAII::Device &src,RAII::Device &dst);
-	void createTransferImage(RAII::Device &src);
-	
+	void querySupportBlit(RAII::Device& device);
+
+	//transfer Image between GPU
+	void copyPresentImage(RAII::Device &src, RAII::Device& dst,int src_index);
+	vk::ImageMemoryBarrier insertImageMemoryBarrier(RAII::Device device,
+	                                                vk::Image image,
+	                                                vk::AccessFlags src_access,
+													vk::AccessFlags dst_access,
+	                                                vk::ImageLayout old_layout,
+	                                                vk::ImageLayout new_layout,
+	                                                vk::PipelineStageFlags src_mask, 
+													vk::PipelineStageFlags dst_mask);
 };
