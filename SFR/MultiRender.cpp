@@ -51,10 +51,10 @@ void MultiRender::init(GLFWwindow* window)
 	// Instance
 	instance_ = createInstance();
 	CHECK_NULL(instance_)
-		// Surface
-		surface_ = createSurface(window);
+	// Surface
+	surface_ = createSurface(window);
 	CHECK_NULL(surface_)
-		// physical GPU
+	// physical GPU
 	createPhysicalDevice();
 	CHECK_NULL(iGPU_.physicalDevice)
 	CHECK_NULL(dGPU_.physicalDevice)
@@ -65,10 +65,10 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.device = createDevice(iGPU_);
 	dGPU_.device = createDevice(dGPU_);
 	CHECK_NULL(iGPU_.device)
-		CHECK_NULL(dGPU_.device)
+	CHECK_NULL(dGPU_.device)
 
-		// create Command Queue
-		createQueue();
+	// create Command Queue
+	createQueue();
 
 	// ceate Swap chain
 	int w, h;
@@ -84,8 +84,8 @@ void MultiRender::init(GLFWwindow* window)
 	dGPU_.swapchain.imageViews = createSwapchainImageViews(dGPU_.device, dGPU_.swapchain);
 	CHECK_NULL(dGPU_.swapchain.swapchain)
 
-		// Render Pass
-		iGPU_.renderPass = createRenderPass(iGPU_.device);
+	// Render Pass
+	iGPU_.renderPass = createRenderPass(iGPU_.device);
 	dGPU_.renderPass = createRenderPass(dGPU_.device);
 
 	// Frame Buffer TODO Only iGPU
@@ -995,7 +995,7 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	                         vk::ImageLayout::eTransferSrcOptimal,
 	                         vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
 
-	// Copy Image src Device to src host visable
+	// Step 1: Copy Image src Device to src host visable
 	
 	vk::ImageCopy image_copy_region;
 	
@@ -1009,11 +1009,21 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 		1, &image_copy_region);
 
 	endSingleCommand(src, copy_command,src.graphicPipeline.commandPool, src.graphicsQueue);
-	// Copy Image src host to dst host
 
+	// Step 2: Copy Image src host to dst host
+	vk::ImageSubresource subresource{vk::ImageAspectFlagBits::eColor,0,0};
+	auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
+	auto requirements = queryImageMemRequiredInfo(src, src.mappingImage, 
+		 vk::MemoryPropertyFlagBits::eHostVisible |vk::MemoryPropertyFlagBits::eHostCoherent);
 
+	void *src_data = src.device.mapMemory(src.mappingMemory, 0, requirements.size);
+	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, requirements.size);
+	memcpy(dst_data, src_data, requirements.size);
+	src.device.unmapMemory(src.mappingMemory);
+	dst.device.unmapMemory(dst.mappingMemory);
+	
 
-	// Copy Image dst host to dst Device
+	// Step 3: Copy Image dst host to dst Device
 
 }
 
