@@ -129,6 +129,7 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.index = 0;
 	dGPU_.index = 1;
 
+	
 	// Tmp Image to swap GPU-GPU
 	vk::Extent3D extent = {
 		swapchainRequiredInfo_.extent.width,
@@ -150,10 +151,12 @@ void MultiRender::init(GLFWwindow* window)
 		vk::MemoryPropertyFlagBits::eHostCoherent, 
 		dGPU_.mappingImage);
 	dGPU_.device.bindImageMemory(dGPU_.mappingImage, dGPU_.mappingMemory, 0);
-
+	
 
 	// query support copy method
+	std::cout << "iGPU" << "\t"<<std::endl;
 	querySupportBlit(iGPU_);
+	std::cout << "dGPU" << "\t"<<std::endl;
 	querySupportBlit(dGPU_);
 }
 
@@ -831,7 +834,7 @@ vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::F
 		.setSharingMode(vk::SharingMode::eExclusive)
 		.setTiling(vk::ImageTiling::eLinear)
 		.setExtent(extent)
-		.setArrayLayers(0)
+		.setArrayLayers(1)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setMipLevels(1)
 		.setSamples(vk::SampleCountFlagBits::e1)
