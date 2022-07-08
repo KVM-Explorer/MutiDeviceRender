@@ -39,9 +39,12 @@ private:
 	vk::RenderPass createRenderPass(vk::Device);
 	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass, RAII::SwapChain swapchain);
 
+
 	// Pipeline
 	vk::CommandPool createCommandPool(vk::Device device,vk::CommandPoolCreateFlagBits flags, uint32_t index);
 	vk::CommandBuffer createCommandBuffer(vk::Device device,vk::CommandPool command_pool);
+	void endSingleCommand(RAII::Device& device, vk::CommandBuffer& command, vk::CommandPool pool, vk::Queue& queue);
+	vk::CommandBuffer startSingleCommand(RAII::Device& device, vk::CommandPool command_pool);
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
 	void recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame);
@@ -66,11 +69,12 @@ private:
 	//transfer Image between GPU
 	void copyPresentImage(RAII::Device &src, RAII::Device& dst,int src_index);
 	vk::ImageMemoryBarrier insertImageMemoryBarrier(RAII::Device device,
+	                                                vk::CommandBuffer command_buffer,
 	                                                vk::Image image,
 	                                                vk::AccessFlags src_access,
-													vk::AccessFlags dst_access,
+	                                                vk::AccessFlags dst_access,
 	                                                vk::ImageLayout old_layout,
 	                                                vk::ImageLayout new_layout,
-	                                                vk::PipelineStageFlags src_mask, 
-													vk::PipelineStageFlags dst_mask);
+	                                                vk::PipelineStageFlags src_mask, vk::PipelineStageFlags dst_mask);
+	
 };

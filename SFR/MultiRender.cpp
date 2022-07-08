@@ -975,41 +975,56 @@ void MultiRender::querySupportBlit(RAII::Device& device)
 
 void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src_index)
 {
+	vk::CommandBuffer copy_command = createCommandBuffer(src.device, src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
 
 	insertImageMemoryBarrier(src,
+	                         copy_command,
 	                         src.mappingImage,
-							 vk::AccessFlagBits::eNone,
+	                         vk::AccessFlagBits::eNone,
 	                         vk::AccessFlagBits::eTransferWrite,
 	                         vk::ImageLayout::eUndefined,
 	                         vk::ImageLayout::eTransferDstOptimal,
-	                         vk::PipelineStageFlagBits::eTransfer,
-	                         vk::PipelineStageFlagBits::eTransfer);
+	                         vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
 	insertImageMemoryBarrier(src,
-		src.swapchain.images[src_index],
-		vk::AccessFlagBits::eMemoryRead,
-		vk::AccessFlagBits::eTransferRead,
-		vk::ImageLayout::ePresentSrcKHR,
-		vk::ImageLayout::eTransferSrcOptimal,
-		vk::PipelineStageFlagBits::eTransfer,
-		vk::PipelineStageFlagBits::eTransfer);
+	                         copy_command,
+	                         src.swapchain.images[src_index],
+	                         vk::AccessFlagBits::eMemoryRead,
+	                         vk::AccessFlagBits::eTransferRead,
+	                         vk::ImageLayout::ePresentSrcKHR,
+	                         vk::ImageLayout::eTransferSrcOptimal,
+	                         vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
 
 	// Copy Image src Device to src host visable
+	
+	vk::ImageCopy image_copy_region;
+	
+	image_copy_region.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
+		.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
+		.setExtent({ swapchainRequiredInfo_.extent.width,swapchainRequiredInfo_.extent.height,1 });
+	copy_command.copyImage(src.swapchain.images[src_index],
+		vk::ImageLayout::eTransferSrcOptimal,
+		src.mappingImage,
+		vk::ImageLayout::eTransferDstOptimal,
+		1, &image_copy_region);
 
+	endSingleCommand(src, copy_command,src.graphicPipeline.commandPool, src.graphicsQueue);
 	// Copy Image src host to dst host
+
+
 
 	// Copy Image dst host to dst Device
 
 }
 
 vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device,
-	vk::Image image,
-	vk::AccessFlags src_access,
-	vk::AccessFlags dst_access,
-	vk::ImageLayout old_layout,
-	vk::ImageLayout new_layout,
-	vk::PipelineStageFlags src_mask,
-	vk::PipelineStageFlags dst_mask)
+                                                             vk::CommandBuffer command_buffer,
+                                                             vk::Image image,
+                                                             vk::AccessFlags src_access,
+                                                             vk::AccessFlags dst_access,
+                                                             vk::ImageLayout old_layout,
+                                                             vk::ImageLayout new_layout,
+                                                             vk::PipelineStageFlags src_mask, vk::PipelineStageFlags dst_mask)
 															 
 {
 	vk::ImageMemoryBarrier barrier;
@@ -1021,8 +1036,34 @@ vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device
 		.setImage(image);
 
 
-	device.graphicPipeline.commandBuffer.pipelineBarrier(src_mask, dst_mask,vk::DependencyFlagBits::eByRegion, 0, nullptr, 0, nullptr, 1, &barrier);
+	command_buffer.pipelineBarrier(src_mask, dst_mask,vk::DependencyFlagBits::eByRegion, 0, nullptr, 0, nullptr, 1, &barrier);
 	return barrier;
+}
+
+void MultiRender::endSingleCommand(RAII::Device& device, vk::CommandBuffer& command, vk::CommandPool pool, vk::Queue& queue)
+{
+	command.end();
+
+	vk::SubmitInfo submit_info;
+	submit_info.setCommandBufferCount(1)
+		.setCommandBuffers(command);
+
+	vk::Fence fence = createFence(device.device);
+	queue.submit(submit_info, fence);
+
+	auto result = device.device.waitForFences(1,&fence,true,std::numeric_limits<uint64_t>::max());
+
+	device.device.destroyFence(fence);
+	device.device.freeCommandBuffers(pool,command);
+}
+
+vk::CommandBuffer MultiRender::startSingleCommand(RAII::Device& device, vk::CommandPool command_pool)
+{
+	vk::CommandBuffer  command = createCommandBuffer(device.device, command_pool);
+	vk::CommandBufferBeginInfo begin_info;
+	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	command.begin(begin_info);
+	return command;
 }
 
 
