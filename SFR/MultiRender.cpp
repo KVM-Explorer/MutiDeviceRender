@@ -835,7 +835,7 @@ vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::F
 		.setTiling(vk::ImageTiling::eLinear)
 		.setExtent(extent)
 		.setArrayLayers(1)
-		.setInitialLayout(vk::ImageLayout::eUndefined)
+		.setInitialLayout(vk::ImageLayout::eGeneral)
 		.setMipLevels(1)
 		.setSamples(vk::SampleCountFlagBits::e1)
 		.setUsage(flags);
@@ -978,15 +978,15 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	vk::CommandBuffer copy_command = createCommandBuffer(src.device, src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
 
-	insertImageMemoryBarrier(src,
+	insertImageMemoryBarrier(src,		// mapping image
 	                         copy_command,
 	                         src.mappingImage,
 	                         vk::AccessFlagBits::eNone,
 	                         vk::AccessFlagBits::eTransferWrite,
-	                         vk::ImageLayout::eUndefined,
+	                         vk::ImageLayout::eGeneral,
 	                         vk::ImageLayout::eTransferDstOptimal,
 	                         vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(src,
+	insertImageMemoryBarrier(src,		// present image
 	                         copy_command,
 	                         src.swapchain.images[src_index],
 	                         vk::AccessFlagBits::eMemoryRead,
@@ -1008,15 +1008,29 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 		vk::ImageLayout::eTransferDstOptimal,
 		1, &image_copy_region);
 
+	insertImageMemoryBarrier(src, copy_command, src.mappingImage,	// mapping image
+		vk::AccessFlagBits::eTransferWrite,
+		vk::AccessFlagBits::eTransferRead,
+		vk::ImageLayout::eTransferDstOptimal,
+		vk::ImageLayout::eGeneral,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	insertImageMemoryBarrier(src, copy_command, src.swapchain.images[src_index],	// present image
+		vk::AccessFlagBits::eTransferRead,
+		vk::AccessFlagBits::eMemoryRead,
+		vk::ImageLayout::eTransferSrcOptimal,
+		vk::ImageLayout::ePresentSrcKHR,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
 	endSingleCommand(src, copy_command,src.graphicPipeline.commandPool, src.graphicsQueue);
 
-	// Step 2: Copy Image src host to dst host
+	// Step 2: Copy Image src host to dst host by mapping memory
 	vk::ImageSubresource subresource{vk::ImageAspectFlagBits::eColor,0,0};
 	auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
 	auto requirements = queryImageMemRequiredInfo(src, src.mappingImage, 
 		 vk::MemoryPropertyFlagBits::eHostVisible |vk::MemoryPropertyFlagBits::eHostCoherent);
 
-	void *src_data = src.device.mapMemory(src.mappingMemory, 0, requirements.size);
+	void* src_data = src.device.mapMemory(src.mappingMemory, 0, requirements.size);
 	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, requirements.size);
 	memcpy(dst_data, src_data, requirements.size);
 	src.device.unmapMemory(src.mappingMemory);
@@ -1024,6 +1038,43 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	
 
 	// Step 3: Copy Image dst host to dst Device
+
+	copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
+	insertImageMemoryBarrier(dst, copy_command,dst.swapchain.images[src_index],
+		vk::AccessFlagBits::eMemoryRead,
+		vk::AccessFlagBits::eTransferWrite,
+		vk::ImageLayout::ePresentSrcKHR,
+		vk::ImageLayout::eTransferDstOptimal,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	insertImageMemoryBarrier(dst,copy_command,dst.mappingImage,
+		vk::AccessFlagBits::eNone,
+		vk::AccessFlagBits::eTransferRead,
+		vk::ImageLayout::eGeneral,
+		vk::ImageLayout::eTransferSrcOptimal,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	copy_command.copyImage(dst.mappingImage,
+		vk::ImageLayout::eTransferSrcOptimal,
+		dst.swapchain.images[src_index],
+		vk::ImageLayout::eTransferDstOptimal,
+		1, &image_copy_region);
+	insertImageMemoryBarrier(dst, copy_command, dst.swapchain.images[src_index],
+		vk::AccessFlagBits::eTransferWrite,
+		vk::AccessFlagBits::eMemoryRead,
+		vk::ImageLayout::eTransferDstOptimal,
+		vk::ImageLayout::ePresentSrcKHR,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,
+		vk::AccessFlagBits::eTransferRead,
+		vk::AccessFlagBits::eNone,
+		vk::ImageLayout::eTransferSrcOptimal,
+		vk::ImageLayout::eGeneral,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+
+	endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool,dst.graphicsQueue);
 
 }
 
