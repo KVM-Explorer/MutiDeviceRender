@@ -15,7 +15,7 @@ struct Vertex {
 		vk::VertexInputBindingDescription descripotion;
 		descripotion.setBinding(0)
 			.setInputRate(vk::VertexInputRate::eVertex)	// draw a vertex then to next or  draw a primitives then next
-			.setStride(sizeof(Vertex)); // ¶¥µãµÄsize
+			.setStride(sizeof(Vertex)); // ï¿½ï¿½ï¿½ï¿½ï¿½size
 
 		return descripotion;
 	}
@@ -137,7 +137,7 @@ void MultiRender::init(GLFWwindow* window)
 		1
 	};
 	iGPU_.mappingImage = createImage(iGPU_.device, extent,
-		vk::Format::eB8G8R8A8Srgb,vk::ImageUsageFlagBits::eTransferDst);
+		vk::Format::eB8G8R8A8Srgb,vk::ImageUsageFlagBits::eTransferDst );
 	iGPU_.mappingMemory = allocateImageMemory(iGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -145,7 +145,7 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.device.bindImageMemory(iGPU_.mappingImage, iGPU_.mappingMemory,0);
 
 	dGPU_.mappingImage = createImage(dGPU_.device, extent,
-		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst);
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferSrc);
 	dGPU_.mappingMemory = allocateImageMemory(dGPU_, 
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent, 
@@ -247,11 +247,11 @@ void MultiRender::render()
 		throw std::runtime_error("acquire image failed");
 	}
 
-	uint32_t image_index = result.value;
+	uint32_t igpu_index = result.value;
 
 	// draw
 	iGPU_.graphicPipeline.commandBuffer.reset();
-	recordCommand(iGPU_,iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[image_index]);
+	recordCommand(iGPU_,iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[igpu_index]);
 	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput ;
 	vk::SubmitInfo submit_info;
 	submit_info.setCommandBuffers(iGPU_.graphicPipeline.commandBuffer)
@@ -259,6 +259,8 @@ void MultiRender::render()
 		.setWaitSemaphores(iGPU_.graphicPipeline.imageAvaliableSemaphore)
 		.setWaitDstStageMask(flags);
 	iGPU_.graphicsQueue.submit(submit_info,iGPU_.graphicPipeline.fence);
+
+	/*
 	// present
 	vk::PresentInfoKHR present_info;
 	present_info.setImageIndices(image_index)	// TODO update
@@ -275,10 +277,13 @@ void MultiRender::render()
 	{
 		throw std::runtime_error("Render wait fence failed");
 	}
-	
+	*/
 	//-------------------------------------------- dGPU Render-----------------------------------------------------
 	
+	//--------------------------------------------- Copy Image-----------------------------------------------------
+	
 	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
+	/*
 	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
 		dGPU_.graphicPipeline.imageAvaliableSemaphore);
@@ -310,16 +315,39 @@ void MultiRender::render()
 		.setSwapchains(dGPU_.swapchain.swapchain)
 		.setWaitSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore);
 
+	*/
+	
+	vk::PresentInfoKHR present_info;
+	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain, 
+		std::numeric_limits<uint64_t>::max(),
+		dGPU_.graphicPipeline.imageAvaliableSemaphore);
+
+	if (result.result!=vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Failed to get dGPU image");
+	}
+	uint32_t dgpu_index = result.value;
+	copyPresentImage(iGPU_, dGPU_, igpu_index,dgpu_index);
+
+	present_info.setImageIndices(dgpu_index);
+	present_info.setSwapchains(dGPU_.swapchain.swapchain);
+	
 	if (dGPU_.presentQueue.presentKHR(present_info) != vk::Result::eSuccess)
 	{
 		throw std::runtime_error("Render present failed");
 	}
-
-	if (dGPU_.device.waitForFences(dGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
+	//auto status = dGPU_.device.waitForPresentKHR(dGPU_.swapchain.swapchain, 
+	//	dgpu_index, std::numeric_limits<uint64_t>::max());
+	//if(status !=vk::Result::eSuccess)
+	//{
+	//	throw std::runtime_error("Render wait dgpu present");
+	//}
+	/*if (dGPU_.device.waitForFences(dGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
 		vk::Result::eSuccess)
 	{
 		throw std::runtime_error("Render wait fence failed");
-	}
+	}*/
+	
 	
 }
 
@@ -421,7 +449,7 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 		// TODO viewport and scissor
 		vk::PipelineViewportStateCreateInfo viewport_state;
 		vk::Viewport viewport(0, 0,
-			swapchainRequiredInfo_.extent.width,
+			swapchainRequiredInfo_.extent.width/2,
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
 		vk::Rect2D scissor({ 0,0 },
@@ -525,7 +553,7 @@ void MultiRender::createPhysicalDevice()
 		auto dproperty = device.getProperties();
 		auto features = device.getFeatures();
 	}
-	// TODO ÅäÖÃ¶àÉè±¸
+	// TODO ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½è±¸
 	iGPU_.physicalDevice = phycial_device[0];
 	std::cout << "iGPU: " << phycial_device[0].getProperties().deviceName << std::endl;
 	dGPU_.physicalDevice = phycial_device[1];
@@ -607,13 +635,16 @@ vk::SwapchainKHR MultiRender::createSwapchain(vk::Device device, RAII::QueueFami
 			indies.presentIndices.value(),
 		};
 		info.setQueueFamilyIndices(indices);
-		info.setImageSharingMode(vk::SharingMode::eConcurrent);	// ¶ÓÁÐ²»Í¬£¬²¢ÐÐ´æ´¢
+		info.setImageSharingMode(vk::SharingMode::eConcurrent);	// ï¿½ï¿½ï¿½Ð²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½Ð´æ´¢
 	}
 	info.setClipped(false);
 	info.setSurface(surface_);
-	info.setImageArrayLayers(1);	// Í¼²ã
-	info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);	// ²»Í¸Ã÷
-	info.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment);
+	info.setImageArrayLayers(1);	// Í¼ï¿½ï¿½
+	info.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);	// ï¿½ï¿½Í¸ï¿½ï¿½
+	info.setImageUsage(
+		vk::ImageUsageFlagBits::eColorAttachment|
+		vk::ImageUsageFlagBits::eTransferSrc|
+		vk::ImageUsageFlagBits::eTransferDst);
 	return device.createSwapchainKHR(info);
 }
 
@@ -671,7 +702,7 @@ vk::RenderPass MultiRender::createRenderPass(vk::Device device)
 
 std::vector<vk::Framebuffer> MultiRender::createFrameBuffers(vk::Device device, vk::RenderPass render_pass,RAII::SwapChain swapchain)
 {
-	// ¶ÔÓÚÃ¿¸öimageview ´´½¨framebuffer
+	// ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½imageview ï¿½ï¿½ï¿½ï¿½framebuffer
 	std::vector<vk::Framebuffer> result;
 
 	for (int i = 0; i < swapchain.imageViews.size(); i++)
@@ -704,7 +735,7 @@ vk::CommandBuffer MultiRender::createCommandBuffer(vk::Device device, vk::Comman
 	info.setCommandBufferCount(1);
 	info.setLevel(vk::CommandBufferLevel::ePrimary);
 
-	//TODO ×¢Òâcommand buffer
+	//TODO ×¢ï¿½ï¿½command buffer
 	return device.allocateCommandBuffers(info)[0];
 }
 
@@ -739,8 +770,7 @@ void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk
 		render_pass_begin_info.setRenderPass(device.renderPass)
 			.setRenderArea(vk::Rect2D(
 				{ 0,0 },
-				//swapchainRequiredInfo_.extent
-				{ 800,300 }
+				swapchainRequiredInfo_.extent
 			))
 			.setClearValues(value)
 			.setFramebuffer(frame_buffer);
@@ -835,7 +865,7 @@ vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::F
 		.setTiling(vk::ImageTiling::eLinear)
 		.setExtent(extent)
 		.setArrayLayers(1)
-		.setInitialLayout(vk::ImageLayout::eGeneral)
+		.setInitialLayout(vk::ImageLayout::eUndefined)
 		.setMipLevels(1)
 		.setSamples(vk::SampleCountFlagBits::e1)
 		.setUsage(flags);
@@ -973,9 +1003,9 @@ void MultiRender::querySupportBlit(RAII::Device& device)
 }
 
 
-void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src_index)
+void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src_index, int dst_index)
 {
-	vk::CommandBuffer copy_command = createCommandBuffer(src.device, src.graphicPipeline.commandPool);
+	vk::CommandBuffer copy_command =startSingleCommand(src,src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
 
 	insertImageMemoryBarrier(src,		// mapping image
@@ -983,7 +1013,7 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	                         src.mappingImage,
 	                         vk::AccessFlagBits::eNone,
 	                         vk::AccessFlagBits::eTransferWrite,
-	                         vk::ImageLayout::eGeneral,
+	                         vk::ImageLayout::eUndefined,
 	                         vk::ImageLayout::eTransferDstOptimal,
 	                         vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
 	insertImageMemoryBarrier(src,		// present image
@@ -1025,13 +1055,24 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	endSingleCommand(src, copy_command,src.graphicPipeline.commandPool, src.graphicsQueue);
 
 	// Step 2: Copy Image src host to dst host by mapping memory
+	copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
+	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,
+		vk::AccessFlagBits::eNone,
+		vk::AccessFlagBits::eTransferWrite,
+		vk::ImageLayout::eUndefined,
+		vk::ImageLayout::eGeneral,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool, dst.graphicsQueue);
+
 	vk::ImageSubresource subresource{vk::ImageAspectFlagBits::eColor,0,0};
 	auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
+	
 	auto requirements = queryImageMemRequiredInfo(src, src.mappingImage, 
 		 vk::MemoryPropertyFlagBits::eHostVisible |vk::MemoryPropertyFlagBits::eHostCoherent);
 
-	void* src_data = src.device.mapMemory(src.mappingMemory, 0, requirements.size);
-	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, requirements.size);
+	void* src_data = src.device.mapMemory(src.mappingMemory, 0, VK_WHOLE_SIZE);
+	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, VK_WHOLE_SIZE);
 	memcpy(dst_data, src_data, requirements.size);
 	src.device.unmapMemory(src.mappingMemory);
 	dst.device.unmapMemory(dst.mappingMemory);
@@ -1040,40 +1081,48 @@ void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src
 	// Step 3: Copy Image dst host to dst Device
 
 	copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
-	insertImageMemoryBarrier(dst, copy_command,dst.swapchain.images[src_index],
-		vk::AccessFlagBits::eMemoryRead,
+	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,		// mapping image
 		vk::AccessFlagBits::eTransferWrite,
-		vk::ImageLayout::ePresentSrcKHR,
-		vk::ImageLayout::eTransferDstOptimal,
-		vk::PipelineStageFlagBits::eTransfer,
-		vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(dst,copy_command,dst.mappingImage,
-		vk::AccessFlagBits::eNone,
 		vk::AccessFlagBits::eTransferRead,
 		vk::ImageLayout::eGeneral,
 		vk::ImageLayout::eTransferSrcOptimal,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	copy_command.copyImage(dst.mappingImage,
+	
+	insertImageMemoryBarrier(dst, copy_command,dst.swapchain.images[dst_index],	// present image
+		vk::AccessFlagBits::eMemoryRead,
+		vk::AccessFlagBits::eTransferWrite,
+		vk::ImageLayout::eUndefined,
+		vk::ImageLayout::eTransferDstOptimal,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	
+	
+	image_copy_region.setExtent({ swapchainRequiredInfo_.extent.width,swapchainRequiredInfo_.extent.height,1 })
+		.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0 ,1 })
+		.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 });
+	
+	copy_command.copyImage(dst.mappingImage,		// mapping image
 		vk::ImageLayout::eTransferSrcOptimal,
-		dst.swapchain.images[src_index],
+		dst.swapchain.images[dst_index],
 		vk::ImageLayout::eTransferDstOptimal,
 		1, &image_copy_region);
-	insertImageMemoryBarrier(dst, copy_command, dst.swapchain.images[src_index],
+	
+	insertImageMemoryBarrier(dst, copy_command, dst.swapchain.images[dst_index],  //present image
 		vk::AccessFlagBits::eTransferWrite,
 		vk::AccessFlagBits::eMemoryRead,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::ImageLayout::ePresentSrcKHR,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,
+	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,	 // mapping Image
 		vk::AccessFlagBits::eTransferRead,
 		vk::AccessFlagBits::eNone,
 		vk::ImageLayout::eTransferSrcOptimal,
 		vk::ImageLayout::eGeneral,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-
+	
 	endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool,dst.graphicsQueue);
 
 }

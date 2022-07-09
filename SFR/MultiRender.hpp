@@ -67,7 +67,7 @@ private:
 	void querySupportBlit(RAII::Device& device);
 
 	//transfer Image between GPU
-	void copyPresentImage(RAII::Device &src, RAII::Device& dst,int src_index);
+	void copyPresentImage(RAII::Device &src, RAII::Device& dst, int src_index, int dst_index);
 	vk::ImageMemoryBarrier insertImageMemoryBarrier(RAII::Device device,
 	                                                vk::CommandBuffer command_buffer,
 	                                                vk::Image image,
