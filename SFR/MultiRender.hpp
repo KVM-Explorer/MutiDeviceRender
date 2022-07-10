@@ -25,6 +25,7 @@ private:
 	RAII::Device iGPU_;
 	RAII::Device dGPU_;
 	RAII::SwapChainRequiredInfo swapchainRequiredInfo_;
+	int acquiredNext{-1 };
 	
 	
 
@@ -36,7 +37,8 @@ private:
 	void createQueue();
 	vk::SwapchainKHR createSwapchain(vk::Device device, RAII::QueueFamilyIndices);
 	std::vector<vk::ImageView> createSwapchainImageViews(vk::Device device, RAII::SwapChain swapchain);
-	vk::RenderPass createRenderPass(vk::Device);
+	vk::RenderPass createRenderPass(vk::Device, vk::AttachmentLoadOp load_op, vk::AttachmentStoreOp store_op, vk::ImageLayout init_layout, vk::ImageLayout
+	                                final_layout);
 	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass, RAII::SwapChain swapchain);
 
 
@@ -57,7 +59,7 @@ private:
 	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
 
 	// Image
-	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlagBits flags);
+	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlags flags);
 	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);;
 	// Query
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
@@ -67,7 +69,7 @@ private:
 	void querySupportBlit(RAII::Device& device);
 
 	//transfer Image between GPU
-	void copyPresentImage(RAII::Device &src, RAII::Device& dst, int src_index, int dst_index);
+	void copyPresentImage(RAII::Device &src, RAII::Device& dst, uint32_t src_index, uint32_t dst_index);
 	vk::ImageMemoryBarrier insertImageMemoryBarrier(RAII::Device device,
 	                                                vk::CommandBuffer command_buffer,
 	                                                vk::Image image,
@@ -77,4 +79,10 @@ private:
 	                                                vk::ImageLayout new_layout,
 	                                                vk::PipelineStageFlags src_mask, vk::PipelineStageFlags dst_mask);
 	
+	// render
+	std::tuple<uint32_t, uint32_t> commonPrepare();
+	void prepareTexture();
+	void renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index);
+	void renderByiGPU(uint32_t igpu_index, uint32_t dgpu_index);
+	void presentImage(uint32_t igpu_index);
 };

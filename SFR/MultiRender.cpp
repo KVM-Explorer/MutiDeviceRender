@@ -85,8 +85,8 @@ void MultiRender::init(GLFWwindow* window)
 	CHECK_NULL(dGPU_.swapchain.swapchain)
 
 	// Render Pass
-	iGPU_.renderPass = createRenderPass(iGPU_.device);
-	dGPU_.renderPass = createRenderPass(dGPU_.device);
+	iGPU_.renderPass = createRenderPass(iGPU_.device,vk::AttachmentLoadOp::eClear,vk::AttachmentStoreOp::eStore,vk::ImageLayout::eUndefined,vk::ImageLayout::ePresentSrcKHR);
+	dGPU_.renderPass = createRenderPass(dGPU_.device,vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR);
 
 	// Frame Buffer TODO Only iGPU
 	iGPU_.frameBuffer = createFrameBuffers(iGPU_.device, iGPU_.renderPass, iGPU_.swapchain);
@@ -97,13 +97,13 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.graphicPipeline.commandPool = createCommandPool(iGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 		iGPU_.queueIndices.computerIndices.value());
 	CHECK_NULL(iGPU_.graphicPipeline.commandPool)
-		iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
+	iGPU_.graphicPipeline.commandBuffer = createCommandBuffer(iGPU_.device, iGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(iGPU_.graphicPipeline.commandBuffer)
 
-		dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+	dGPU_.graphicPipeline.commandPool = createCommandPool(dGPU_.device, vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
 			dGPU_.queueIndices.computerIndices.value());
 	CHECK_NULL(dGPU_.graphicPipeline.commandPool)
-		dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
+	dGPU_.graphicPipeline.commandBuffer = createCommandBuffer(dGPU_.device, dGPU_.graphicPipeline.commandPool);
 	CHECK_NULL(dGPU_.graphicPipeline.commandBuffer)
 
 		// Semaphore include semaphore and fence
@@ -137,7 +137,7 @@ void MultiRender::init(GLFWwindow* window)
 		1
 	};
 	iGPU_.mappingImage = createImage(iGPU_.device, extent,
-		vk::Format::eB8G8R8A8Srgb,vk::ImageUsageFlagBits::eTransferDst );
+		vk::Format::eB8G8R8A8Srgb,vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc);
 	iGPU_.mappingMemory = allocateImageMemory(iGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -145,7 +145,7 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.device.bindImageMemory(iGPU_.mappingImage, iGPU_.mappingMemory,0);
 
 	dGPU_.mappingImage = createImage(dGPU_.device, extent,
-		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferSrc);
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst);
 	dGPU_.mappingMemory = allocateImageMemory(dGPU_, 
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent, 
@@ -153,11 +153,11 @@ void MultiRender::init(GLFWwindow* window)
 	dGPU_.device.bindImageMemory(dGPU_.mappingImage, dGPU_.mappingMemory, 0);
 	
 
-	// query support copy method
-	std::cout << "iGPU" << "\t"<<std::endl;
-	querySupportBlit(iGPU_);
-	std::cout << "dGPU" << "\t"<<std::endl;
-	querySupportBlit(dGPU_);
+	//// query support copy method
+	//std::cout << "iGPU" << "\t"<<std::endl;
+	//querySupportBlit(iGPU_);
+	//std::cout << "dGPU" << "\t"<<std::endl;
+	//querySupportBlit(dGPU_);
 }
 
 void MultiRender::release()
@@ -234,121 +234,10 @@ void MultiRender::release()
 
 void MultiRender::render()
 {
-	// TODO computer shader
-	vk::ResultValue<uint32_t> result{ vk::Result::eErrorUnknown,0 };
-
-	// iGPU Render
-	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
-	result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
-		std::numeric_limits<uint64_t>::max(),
-		iGPU_.graphicPipeline.imageAvaliableSemaphore);
-	if (result.result != vk::Result::eSuccess)
-	{
-		throw std::runtime_error("acquire image failed");
-	}
-
-	uint32_t igpu_index = result.value;
-
-	// draw
-	iGPU_.graphicPipeline.commandBuffer.reset();
-	recordCommand(iGPU_,iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[igpu_index]);
-	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput ;
-	vk::SubmitInfo submit_info;
-	submit_info.setCommandBuffers(iGPU_.graphicPipeline.commandBuffer)
-		.setSignalSemaphores(iGPU_.graphicPipeline.presentAvaliableSemaphore)
-		.setWaitSemaphores(iGPU_.graphicPipeline.imageAvaliableSemaphore)
-		.setWaitDstStageMask(flags);
-	iGPU_.graphicsQueue.submit(submit_info,iGPU_.graphicPipeline.fence);
-
-	/*
-	// present
-	vk::PresentInfoKHR present_info;
-	present_info.setImageIndices(image_index)	// TODO update
-		.setSwapchains(iGPU_.swapchain.swapchain)
-		.setWaitSemaphores(iGPU_.graphicPipeline.presentAvaliableSemaphore);
-
-	if (iGPU_.presentQueue.presentKHR(present_info) != vk::Result::eSuccess)
-	{
-		throw std::runtime_error("Render present failed");
-	}
-
-	if (iGPU_.device.waitForFences(iGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
-		vk::Result::eSuccess)
-	{
-		throw std::runtime_error("Render wait fence failed");
-	}
-	*/
-	//-------------------------------------------- dGPU Render-----------------------------------------------------
-	
-	//--------------------------------------------- Copy Image-----------------------------------------------------
-	
-	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
-	/*
-	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,	// TODO update
-		std::numeric_limits<uint64_t>::max(),
-		dGPU_.graphicPipeline.imageAvaliableSemaphore);
-	if (result.result != vk::Result::eSuccess)
-	{
-		throw std::runtime_error("acquire image failed");
-	}
-
-	//uint32_t image_index = result.value;
-	image_index = result.value;
-
-	// draw
-	dGPU_.graphicPipeline.commandBuffer.reset();
-	
-	recordCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.frameBuffer[image_index]);
-
-	//vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	//submit_info;
-	//vk::SubmitInfo submit_info;
-	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer)
-		.setSignalSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore)
-		.setWaitSemaphores(dGPU_.graphicPipeline.imageAvaliableSemaphore)
-		.setWaitDstStageMask(flags);
-	dGPU_.graphicsQueue.submit(submit_info, dGPU_.graphicPipeline.fence);
-	// present
-	//vk::PresentInfoKHR present_info;
-	present_info.setImageIndices(image_index)	// TODO update
-		.setSwapchains(dGPU_.swapchain.swapchain)
-		.setWaitSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore);
-
-	*/
-	
-	vk::PresentInfoKHR present_info;
-	result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain, 
-		std::numeric_limits<uint64_t>::max(),
-		dGPU_.graphicPipeline.imageAvaliableSemaphore);
-
-	if (result.result!=vk::Result::eSuccess)
-	{
-		throw std::runtime_error("Failed to get dGPU image");
-	}
-	uint32_t dgpu_index = result.value;
-	copyPresentImage(iGPU_, dGPU_, igpu_index,dgpu_index);
-
-	present_info.setImageIndices(dgpu_index);
-	present_info.setSwapchains(dGPU_.swapchain.swapchain);
-	
-	if (dGPU_.presentQueue.presentKHR(present_info) != vk::Result::eSuccess)
-	{
-		throw std::runtime_error("Render present failed");
-	}
-	//auto status = dGPU_.device.waitForPresentKHR(dGPU_.swapchain.swapchain, 
-	//	dgpu_index, std::numeric_limits<uint64_t>::max());
-	//if(status !=vk::Result::eSuccess)
-	//{
-	//	throw std::runtime_error("Render wait dgpu present");
-	//}
-	/*if (dGPU_.device.waitForFences(dGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
-		vk::Result::eSuccess)
-	{
-		throw std::runtime_error("Render wait fence failed");
-	}*/
-	
-	
+	auto [igpu_index,dgpu_index] = commonPrepare();
+	renderBydGPU(igpu_index, dgpu_index);
+	renderByiGPU(igpu_index, dgpu_index);
+	presentImage(igpu_index);
 }
 
 void MultiRender::waitIdle()
@@ -673,19 +562,22 @@ std::vector<vk::ImageView> MultiRender::createSwapchainImageViews(vk::Device dev
 	return views;
 }
 
-vk::RenderPass MultiRender::createRenderPass(vk::Device device)
+vk::RenderPass MultiRender::createRenderPass(vk::Device device, vk::AttachmentLoadOp load_op, 
+	vk::AttachmentStoreOp store_op, 
+	vk::ImageLayout init_layout,
+	vk::ImageLayout final_layout)
 {
 
 	vk::RenderPassCreateInfo info;
 	vk::AttachmentDescription attachment_desc;
 	attachment_desc.setSamples(vk::SampleCountFlagBits::e1)
-		.setLoadOp(vk::AttachmentLoadOp::eClear)
-		.setStoreOp(vk::AttachmentStoreOp::eStore)
+		.setLoadOp(load_op)
+		.setStoreOp(store_op)
 		.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
 		.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
 		.setFormat(swapchainRequiredInfo_.format.format)
-		.setInitialLayout(vk::ImageLayout::eUndefined)
-		.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+		.setInitialLayout(init_layout)
+		.setFinalLayout(final_layout);
 	info.setAttachments(attachment_desc);
 
 	vk::SubpassDescription subpass_desc;
@@ -855,7 +747,7 @@ vk::Buffer MultiRender::createBuffer(RAII::Device device, vk::BufferUsageFlags f
 	return device.device.createBuffer(info);
 }
 
-vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::Format format, vk::ImageUsageFlagBits flags)
+vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::Format format, vk::ImageUsageFlags flags)
 {
 	vk::ImageCreateInfo info;
 
@@ -1003,7 +895,7 @@ void MultiRender::querySupportBlit(RAII::Device& device)
 }
 
 
-void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, int src_index, int dst_index)
+void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, uint32_t src_index, uint32_t dst_index)
 {
 	vk::CommandBuffer copy_command =startSingleCommand(src,src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
@@ -1148,6 +1040,107 @@ vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device
 
 	command_buffer.pipelineBarrier(src_mask, dst_mask,vk::DependencyFlagBits::eByRegion, 0, nullptr, 0, nullptr, 1, &barrier);
 	return barrier;
+}
+
+std::tuple<uint32_t, uint32_t> MultiRender::commonPrepare()
+{
+	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
+	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
+
+	// acquire image index
+	auto result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
+		std::numeric_limits<uint64_t>::max(),
+		iGPU_.graphicPipeline.imageAvaliableSemaphore, 
+		nullptr);
+	if (result.result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Failed to acquire iGPU image failed");
+	}
+
+	uint32_t igpu_index = result.value;
+	uint32_t dgpu_index;
+	vk::PresentInfoKHR present_info;
+	if(acquiredNext==-1)
+	{
+		result = dGPU_.device.acquireNextImageKHR(dGPU_.swapchain.swapchain,
+			0,
+			dGPU_.graphicPipeline.imageAvaliableSemaphore,
+			nullptr);
+
+		if (result.result != vk::Result::eSuccess)
+		{
+			throw std::runtime_error("Failed to acquired dGPU image");
+		}
+		dgpu_index = result.value;
+		acquiredNext = dgpu_index;
+	}else
+	{
+		dgpu_index = acquiredNext;
+		dGPU_.device.signalSemaphore(dGPU_.graphicPipeline.imageAvaliableSemaphore);
+	}
+	
+	return std::make_tuple(igpu_index, dgpu_index);
+}
+
+void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
+{
+	// Step1 render Image
+	// draw
+	dGPU_.graphicPipeline.commandBuffer.reset();
+	recordCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.frameBuffer[dgpu_index]);
+	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	vk::SubmitInfo submit_info;
+	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer)
+		.setSignalSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore)
+		.setWaitSemaphores(dGPU_.graphicPipeline.imageAvaliableSemaphore)
+		.setWaitDstStageMask(flags);
+	dGPU_.graphicsQueue.submit(submit_info, dGPU_.graphicPipeline.fence);
+
+	// Step2 wait for fence
+	auto result = dGPU_.device.waitForFences(dGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max());
+	if(result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed to render by dGPU");
+	}
+	// Step3 Copy Image to iGPU
+	copyPresentImage(dGPU_, iGPU_, dgpu_index, igpu_index);
+	
+}
+
+void MultiRender::renderByiGPU(uint32_t igpu_index, uint32_t dgpu_index)
+{
+	//Step 1 render Image
+	// draw
+	iGPU_.graphicPipeline.commandBuffer.reset();
+	recordCommand(iGPU_, iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[igpu_index]);
+	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	vk::SubmitInfo submit_info;
+	submit_info.setCommandBuffers(iGPU_.graphicPipeline.commandBuffer)
+		.setSignalSemaphores(iGPU_.graphicPipeline.presentAvaliableSemaphore)
+		.setWaitSemaphores(iGPU_.graphicPipeline.imageAvaliableSemaphore)
+		.setWaitDstStageMask(flags);
+	iGPU_.graphicsQueue.submit(submit_info, iGPU_.graphicPipeline.fence);
+}
+
+void MultiRender::presentImage(uint32_t igpu_index)
+{
+	// present iGPU swapchain Image
+		// present
+	vk::PresentInfoKHR present_info;
+	present_info.setImageIndices(igpu_index)
+		.setSwapchains(iGPU_.swapchain.swapchain)
+		.setWaitSemaphores(iGPU_.graphicPipeline.presentAvaliableSemaphore);
+
+	if (iGPU_.presentQueue.presentKHR(present_info) != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Render present failed");
+	}
+
+	if (iGPU_.device.waitForFences(iGPU_.graphicPipeline.fence, true, std::numeric_limits<uint64_t>::max()) !=
+		vk::Result::eSuccess)
+	{
+		throw std::runtime_error("Render wait fence failed");
+	}
 }
 
 void MultiRender::endSingleCommand(RAII::Device& device, vk::CommandBuffer& command, vk::CommandPool pool, vk::Queue& queue)
