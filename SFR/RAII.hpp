@@ -13,13 +13,18 @@ namespace RAII
 	struct Descriptor
 	{
 		vk::Image image;
+		vk::ImageView view;
+		vk::Framebuffer framebuffer;
 		vk::Buffer buffer;
 		vk::DeviceMemory memory;
+		vk::Sampler sampler;
+		vk::DescriptorImageInfo descriptor;
 
 		vk::DescriptorSetLayout descriptorSetLayout;
 		std::vector<vk::DescriptorSet> descriptorSet;
 		vk::DescriptorPool descriptorPool;
 	};
+
 	struct Pipeline
 	{
 		std::vector<vk::ShaderModule> shaders;
@@ -37,6 +42,7 @@ namespace RAII
 		std::vector<vk::Image>	images;
 		std::vector<vk::ImageView> imageViews;
 	};
+
 	struct Device
 	{
 		vk::Device device;
@@ -56,6 +62,7 @@ namespace RAII
 		vk::DeviceMemory mappingMemory;
 		vk::ImageView mappingImageView;
 		vk::Framebuffer mappingFrameBuffer;
+		Descriptor offscreen;
 		bool isSupportsBlit{true};
 	};
 

@@ -36,11 +36,13 @@ private:
 	void createQueue();
 	vk::SwapchainKHR createSwapchain(vk::Device device, RAII::QueueFamilyIndices);
 	std::vector<vk::ImageView> createSwapchainImageViews(vk::Device device, std::vector<vk::Image>& images);
-	vk::ImageView createImageView(vk::Device device, vk::Image image);
+
 	vk::RenderPass createRenderPass(vk::Device, vk::AttachmentLoadOp load_op, vk::AttachmentStoreOp store_op, vk::ImageLayout init_layout, vk::ImageLayout
 	                                final_layout);
 	std::vector<vk::Framebuffer> createFrameBuffers(vk::Device, vk::RenderPass render_pass, std::vector<vk::ImageView> image_views);
 	vk::Framebuffer createFrameBuffer(vk::Device device, vk::RenderPass render_pass, vk::ImageView view);
+	void initiGPUResource();
+	void initdGPUResource();
 
 	// Pipeline
 	vk::CommandPool createCommandPool(vk::Device device,vk::CommandPoolCreateFlagBits flags, uint32_t index);
@@ -49,18 +51,25 @@ private:
 	vk::CommandBuffer startSingleCommand(RAII::Device& device, vk::CommandPool command_pool);
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
-	void recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame);
-	vk::PipelineLayout createPipelineLayout(RAII::Device device);
+	
+	vk::PipelineLayout createPipelineLayout(vk::Device device,vk::DescriptorSetLayout set_layout);
 	void createRenderDescriptor(RAII::Device device);
 
-	// Descriptor
+	// Descriptor Buffer
 	void createVertexBuffer(RAII::Device &device);
 	vk::DeviceMemory allocateMemory(RAII::Device device, vk::Buffer buffer);
 	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
 
-	// Image
+	// Descriptor Image
 	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlags flags);
-	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);;
+	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);
+	vk::ImageView createImageView(vk::Device device, vk::Image image);
+	vk::Sampler createSampler(vk::Device device);
+	vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,uint32_t binding, uint32_t descriptorCount = 1);
+	vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,uint32_t binding, vk::DescriptorImageInfo image_info);
+	vk::DescriptorSetLayout createDescriptorSetLayout(vk::Device device);
+	vk::DescriptorPool createDescriptorPool(vk::Device device);
+	std::vector<vk::DescriptorSet> createDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
 	// Query
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
@@ -85,6 +94,8 @@ private:
 	
 	// render
 	uint32_t commonPrepare();
+	void recordCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
+	void recordOffscreenCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
 	void prepareTexture();
 	void renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index);
 	void renderByiGPU(uint32_t igpu_index, uint32_t dgpu_index);
