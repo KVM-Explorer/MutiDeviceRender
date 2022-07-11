@@ -85,7 +85,8 @@ void MultiRender::init(GLFWwindow* window)
 	//CHECK_NULL(dGPU_.swapchain.swapchain)
 
 	// Render Pass
-	iGPU_.renderPass = createRenderPass(iGPU_.device,vk::AttachmentLoadOp::eClear,vk::AttachmentStoreOp::eStore,vk::ImageLayout::eUndefined,vk::ImageLayout::ePresentSrcKHR);
+	iGPU_.renderPass = createRenderPass(iGPU_.device,vk::AttachmentLoadOp::eClear,vk::AttachmentStoreOp::eStore,
+		vk::ImageLayout::eUndefined,vk::ImageLayout::ePresentSrcKHR);
 	//dGPU_.renderPass = createRenderPass(dGPU_.device,vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR);
 
 	// Frame Buffer TODO Only iGPU
@@ -220,9 +221,8 @@ void MultiRender::release()
 void MultiRender::render()
 {
 	auto igpu_index = commonPrepare();
-	
 	renderBydGPU(0,0);
-	//copyPresentImage(dGPU_, iGPU_, 0, igpu_index);
+	/*copyPresentImage(dGPU_, iGPU_, 0, igpu_index);*/
 	renderByiGPU(igpu_index);
 	presentImage(igpu_index);
 }
@@ -649,6 +649,22 @@ std::vector<vk::DescriptorSet> MultiRender::createDescriptorSet(vk::Device devic
 	return result;
 }
 
+void MultiRender::convertImageLayout(vk::CommandBuffer cmd, vk::Image image, vk::ImageLayout old_layout, vk::ImageLayout new_layout)
+{
+	auto stage_mask = vk::PipelineStageFlagBits::eAllCommands;
+
+	auto image_memory_barrier = insertImageMemoryBarrier(cmd,image,
+		vk::AccessFlagBits::eColorAttachmentRead,
+		vk::AccessFlagBits::eNone,
+		old_layout,
+		new_layout,
+		stage_mask,
+		stage_mask);
+
+	cmd.pipelineBarrier(stage_mask, stage_mask, vk::DependencyFlagBits::eByRegion,
+		0, nullptr, 0, nullptr, 1, &image_memory_barrier);
+}
+
 vk::RenderPass MultiRender::createRenderPass(vk::Device device, vk::AttachmentLoadOp load_op, 
 	vk::AttachmentStoreOp store_op, 
 	vk::ImageLayout init_layout,
@@ -722,6 +738,12 @@ void MultiRender::initiGPUResource()
 	iGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(iGPU_.device);
 	CHECK_NULL(iGPU_.graphicPipeline.pipelineLayout);
 
+	/*for(int i=0;i<swapchainRequiredInfo_.imageCount;i++)
+	{
+		auto cmd = startSingleCommand(iGPU_, iGPU_.graphicPipeline.commandPool);
+		convertImageLayout(cmd, iGPU_.swapchain.images[i], vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+		endSingleCommand(iGPU_, cmd, iGPU_.graphicPipeline.commandPool, iGPU_.graphicsQueue);
+	}*/
 }
 
 void MultiRender::initdGPUResource()
@@ -750,7 +772,8 @@ void MultiRender::initdGPUResource()
 	// Sampler
 	dGPU_.offscreen.sampler = createSampler(dGPU_.device);
 	// Render Pass
-	dGPU_.renderPass = createRenderPass(dGPU_.device, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal);
+	dGPU_.renderPass = createRenderPass(dGPU_.device, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
+		vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
 	// Frame Buffer
 	dGPU_.offscreen.framebuffer = createFrameBuffer(dGPU_.device, dGPU_.renderPass, dGPU_.offscreen.view);
 /*
@@ -1094,7 +1117,7 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 	vk::CommandBuffer copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
 
-	insertImageMemoryBarrier(src,		// mapping image
+	insertImageMemoryBarrier(		// mapping image
 		copy_command,
 		src.mappingImage,
 		vk::AccessFlagBits::eNone,
@@ -1102,7 +1125,7 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(src,		// present image
+	insertImageMemoryBarrier(		// present image
 		copy_command,
 		src.swapchain.images[src_index],
 		vk::AccessFlagBits::eMemoryRead,
@@ -1124,14 +1147,14 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 		vk::ImageLayout::eTransferDstOptimal,
 		1, &image_copy_region);
 
-	insertImageMemoryBarrier(src, copy_command, src.mappingImage,	// mapping image
+	insertImageMemoryBarrier( copy_command, src.mappingImage,	// mapping image
 		vk::AccessFlagBits::eTransferWrite,
 		vk::AccessFlagBits::eTransferRead,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::ImageLayout::eGeneral,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(src, copy_command, src.swapchain.images[src_index],	// present image
+	insertImageMemoryBarrier( copy_command, src.swapchain.images[src_index],	// present image
 		vk::AccessFlagBits::eTransferRead,
 		vk::AccessFlagBits::eMemoryRead,
 		vk::ImageLayout::eTransferSrcOptimal,
@@ -1145,7 +1168,7 @@ void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 {
 	// Step 2: Copy Image src host to dst host by mapping memory
 	auto copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
-	insertImageMemoryBarrier(dst, copy_command, dst.mappingImage,
+	insertImageMemoryBarrier( copy_command, dst.mappingImage,
 		vk::AccessFlagBits::eNone,
 		vk::AccessFlagBits::eTransferWrite,
 		vk::ImageLayout::eUndefined,
@@ -1173,7 +1196,7 @@ void MultiRender::copyMappingToPresent(RAII::Device& src, uint32_t src_index)
 	// Step 3: Copy Image dst host to dst Device
 	vk::CommandBuffer copy_command;
 	copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
-	insertImageMemoryBarrier(src, copy_command, src.mappingImage,		// mapping image
+	insertImageMemoryBarrier( copy_command, src.mappingImage,		// mapping image
 		vk::AccessFlagBits::eTransferWrite,
 		vk::AccessFlagBits::eTransferRead,
 		vk::ImageLayout::eGeneral,
@@ -1181,7 +1204,7 @@ void MultiRender::copyMappingToPresent(RAII::Device& src, uint32_t src_index)
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
 
-	insertImageMemoryBarrier(src, copy_command, src.swapchain.images[src_index],	// present image
+	insertImageMemoryBarrier( copy_command, src.swapchain.images[src_index],	// present image
 		vk::AccessFlagBits::eMemoryRead,
 		vk::AccessFlagBits::eTransferWrite,
 		vk::ImageLayout::eUndefined,
@@ -1200,14 +1223,14 @@ void MultiRender::copyMappingToPresent(RAII::Device& src, uint32_t src_index)
 		vk::ImageLayout::eTransferDstOptimal,
 		1, &image_copy_region);
 
-	insertImageMemoryBarrier(src, copy_command, src.swapchain.images[src_index],  //present image
+	insertImageMemoryBarrier( copy_command, src.swapchain.images[src_index],  //present image
 		vk::AccessFlagBits::eTransferWrite,
 		vk::AccessFlagBits::eMemoryRead,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::ImageLayout::ePresentSrcKHR,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(src, copy_command, src.mappingImage,	 // mapping Image
+	insertImageMemoryBarrier( copy_command, src.mappingImage,	 // mapping Image
 		vk::AccessFlagBits::eTransferRead,
 		vk::AccessFlagBits::eNone,
 		vk::ImageLayout::eTransferSrcOptimal,
@@ -1218,8 +1241,7 @@ void MultiRender::copyMappingToPresent(RAII::Device& src, uint32_t src_index)
 	endSingleCommand(src, copy_command, src.graphicPipeline.commandPool, src.graphicsQueue);
 }
 
-vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device,
-                                                             vk::CommandBuffer command_buffer,
+vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(vk::CommandBuffer command_buffer,
                                                              vk::Image image,
                                                              vk::AccessFlags src_access,
                                                              vk::AccessFlags dst_access,
@@ -1298,8 +1320,12 @@ void MultiRender::renderByiGPU(uint32_t igpu_index)
 
 void MultiRender::presentImage(uint32_t igpu_index)
 {
+	//TODO  Convert Image Layoyut
+	//auto cmd = startSingleCommand(iGPU_, iGPU_.graphicPipeline.commandPool);
+	//convertImageLayout(cmd, iGPU_.swapchain.images[igpu_index], vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR);
+	//endSingleCommand(iGPU_, cmd, iGPU_.graphicPipeline.commandPool, iGPU_.graphicsQueue);
+
 	// present iGPU swapchain Image
-		// present
 	vk::PresentInfoKHR present_info;
 	present_info.setImageIndices(igpu_index)
 		.setSwapchains(iGPU_.swapchain.swapchain)

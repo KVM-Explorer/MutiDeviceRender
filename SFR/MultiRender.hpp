@@ -70,6 +70,7 @@ private:
 	vk::DescriptorSetLayout createDescriptorSetLayout(vk::Device device);
 	vk::DescriptorPool createDescriptorPool(vk::Device device);
 	std::vector<vk::DescriptorSet> createDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
+	void convertImageLayout(vk::CommandBuffer cmd, vk::Image image, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
 	// Query
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
@@ -82,8 +83,7 @@ private:
 	void copyPresentToMapping(RAII::Device& src, uint32_t src_index);
 	void copyMappingToMapping(RAII::Device& src, RAII::Device& device);
 	void copyMappingToPresent(RAII::Device& src, uint32_t src_index);
-	vk::ImageMemoryBarrier insertImageMemoryBarrier(RAII::Device device,
-	                                                vk::CommandBuffer command_buffer,
+	vk::ImageMemoryBarrier insertImageMemoryBarrier(vk::CommandBuffer command_buffer,
 	                                                vk::Image image,
 	                                                vk::AccessFlags src_access,
 	                                                vk::AccessFlags dst_access,
