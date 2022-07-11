@@ -115,7 +115,7 @@ void MultiRender::init(GLFWwindow* window)
 	dGPU_.graphicPipeline.fence = createFence(dGPU_.device);
 
 	// PipelineLayout TODO  Add SetLayout
-	//iGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(iGPU_);
+	//iGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(iGPU_.device);
 	//CHECK_NULL(iGPU_.graphicPipeline.pipelineLayout)
 	//dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_);
 	//CHECK_NULL(dGPU_.graphicPipeline.pipelineLayout)
@@ -130,7 +130,7 @@ void MultiRender::init(GLFWwindow* window)
 
 
 	initdGPUResource();
-	//initiGPUResource();
+	initiGPUResource();
 
 	//// query support copy method
 	//std::cout << "iGPU" << "\t"<<std::endl;
@@ -219,12 +219,12 @@ void MultiRender::release()
 
 void MultiRender::render()
 {
-	//auto igpu_index = commonPrepare();
+	auto igpu_index = commonPrepare();
 	
 	renderBydGPU(0,0);
-	/*copyPresentImage(dGPU_, iGPU_, 0, igpu_index);
-	renderByiGPU(igpu_index, igpu_index);
-	presentImage(igpu_index);*/
+	//copyPresentImage(dGPU_, iGPU_, 0, igpu_index);
+	renderByiGPU(igpu_index);
+	presentImage(igpu_index);
 }
 
 void MultiRender::waitIdle()
@@ -355,7 +355,7 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 			swapchainRequiredInfo_.extent.width/2,
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
-		vk::Rect2D scissor({ 400,0 },
+		vk::Rect2D scissor({ 0,0 },
 			{ swapchainRequiredInfo_.extent.width/2,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
@@ -719,6 +719,9 @@ void MultiRender::initiGPUResource()
 		iGPU_.mappingImage);
 	iGPU_.device.bindImageMemory(iGPU_.mappingImage, iGPU_.mappingMemory, 0);
 
+	iGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(iGPU_.device);
+	CHECK_NULL(iGPU_.graphicPipeline.pipelineLayout);
+
 }
 
 void MultiRender::initdGPUResource()
@@ -800,7 +803,7 @@ vk::Fence MultiRender::createFence(vk::Device device)
 	return device.createFence(info);
 }
 
-void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame_buffer)
+void MultiRender::recordPresentCommand(RAII::Device device,vk::CommandBuffer buffer, vk::Framebuffer frame_buffer)
 {
 
 	vk::CommandBufferBeginInfo begin_info;
@@ -844,7 +847,7 @@ void MultiRender::recordCommand(RAII::Device device,vk::CommandBuffer buffer, vk
 	buffer.end();
 }
 
-void MultiRender::recordOffscreenCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame)
+void MultiRender::recordOffScreenCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame)
 {
 	vk::CommandBufferBeginInfo begin_info;
 	begin_info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -1261,7 +1264,7 @@ void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
 	// Step1 render Image
 	// draw
 	dGPU_.graphicPipeline.commandBuffer.reset();
-	recordOffscreenCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.offscreen.framebuffer);
+	recordOffScreenCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.offscreen.framebuffer);
 	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submit_info;
 	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer);
@@ -1276,14 +1279,14 @@ void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
 	
 }
 
-void MultiRender::renderByiGPU(uint32_t igpu_index, uint32_t dgpu_index)
+void MultiRender::renderByiGPU(uint32_t igpu_index)
 {
 	// reset fence
 	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
 	//Step 1 render Image
 	// draw
 	iGPU_.graphicPipeline.commandBuffer.reset();
-	recordCommand(iGPU_, iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[igpu_index]);
+	recordPresentCommand(iGPU_, iGPU_.graphicPipeline.commandBuffer, iGPU_.frameBuffer[igpu_index]);
 	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submit_info;
 	submit_info.setCommandBuffers(iGPU_.graphicPipeline.commandBuffer)
