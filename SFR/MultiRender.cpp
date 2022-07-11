@@ -141,6 +141,12 @@ void MultiRender::init(GLFWwindow* window)
 
 void MultiRender::release()
 {
+	// Offscreen
+	dGPU_.device.destroyFramebuffer(dGPU_.offscreen.framebuffer);
+	dGPU_.device.destroySampler(dGPU_.offscreen.sampler);
+	dGPU_.device.freeMemory(dGPU_.offscreen.memory);
+	dGPU_.device.destroyImageView(dGPU_.offscreen.view);
+	dGPU_.device.destroyImage(dGPU_.offscreen.image);
 
 	// Mapping Image and Memory
 	iGPU_.device.freeMemory(iGPU_.mappingMemory);
@@ -213,7 +219,7 @@ void MultiRender::release()
 
 void MultiRender::render()
 {
-	auto igpu_index = commonPrepare();
+	//auto igpu_index = commonPrepare();
 	
 	renderBydGPU(0,0);
 	/*copyPresentImage(dGPU_, iGPU_, 0, igpu_index);
@@ -612,7 +618,7 @@ vk::DescriptorPool MultiRender::createDescriptorPool(vk::Device device)
 		return pool_size;
 	};
 	std::array<vk::DescriptorPoolSize, 1> pool_size{
-		createDescriptorSize(vk::DescriptorType::eStorageImage,1)
+		createDescriptorSize(vk::DescriptorType::eCombinedImageSampler,1)
 	};
 	vk::DescriptorPoolCreateInfo descriptor_pool_info;
 	// TODO update max sets 
@@ -1234,11 +1240,6 @@ vk::ImageMemoryBarrier MultiRender::insertImageMemoryBarrier(RAII::Device device
 
 uint32_t MultiRender::commonPrepare()
 {
-	// reset fence
-	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
-	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
-// TODO unlock
-/*
 	// acquire image index
 	auto result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
@@ -1250,12 +1251,13 @@ uint32_t MultiRender::commonPrepare()
 	}
 
 	uint32_t igpu_index = result.value;
-*/
-	return 1;
+	return igpu_index;
 }
 
 void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
 {
+	// reset fence
+	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
 	// Step1 render Image
 	// draw
 	dGPU_.graphicPipeline.commandBuffer.reset();
@@ -1276,6 +1278,8 @@ void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
 
 void MultiRender::renderByiGPU(uint32_t igpu_index, uint32_t dgpu_index)
 {
+	// reset fence
+	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
 	//Step 1 render Image
 	// draw
 	iGPU_.graphicPipeline.commandBuffer.reset();
