@@ -54,6 +54,8 @@ namespace RAII
 		int index;
 		vk::Image mappingImage;
 		vk::DeviceMemory mappingMemory;
+		vk::ImageView mappingImageView;
+		vk::Framebuffer mappingFrameBuffer;
 		bool isSupportsBlit{true};
 	};
 
