@@ -214,7 +214,8 @@ void MultiRender::release()
 void MultiRender::render()
 {
 	auto igpu_index = commonPrepare();
-	renderBydGPU(igpu_index,0);
+	
+	renderBydGPU(0,0);
 	/*copyPresentImage(dGPU_, iGPU_, 0, igpu_index);
 	renderByiGPU(igpu_index, igpu_index);
 	presentImage(igpu_index);*/
@@ -740,9 +741,10 @@ void MultiRender::initdGPUResource()
 	// Sampler
 	dGPU_.offscreen.sampler = createSampler(dGPU_.device);
 	// Render Pass
-	dGPU_.renderPass = createRenderPass(dGPU_.device, vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal);
+	dGPU_.renderPass = createRenderPass(dGPU_.device, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal);
 	// Frame Buffer
 	dGPU_.offscreen.framebuffer = createFrameBuffer(dGPU_.device, dGPU_.renderPass, dGPU_.offscreen.view);
+/*
 	// Descriptor
 	dGPU_.offscreen.descriptor.imageLayout = vk::ImageLayout::eReadOnlyOptimal;
 	dGPU_.offscreen.descriptor.imageView = dGPU_.offscreen.view;
@@ -753,8 +755,9 @@ void MultiRender::initdGPUResource()
 	dGPU_.offscreen.descriptorPool = createDescriptorPool(dGPU_.device);
 	// DescriptorSet
 	dGPU_.offscreen.descriptorSet = createDescriptorSet(dGPU_.device,dGPU_.offscreen.descriptorPool,dGPU_.offscreen.descriptorSetLayout,dGPU_.offscreen.descriptor);
+*/
 	// PipelineLayout
-	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device,dGPU_.offscreen.descriptorSetLayout);
+	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device/*, dGPU_.offscreen.descriptorSetLayout */ );
 
 }
 
@@ -869,11 +872,11 @@ void MultiRender::recordOffscreenCommand(RAII::Device device, vk::CommandBuffer 
 
 }
 
-vk::PipelineLayout MultiRender::createPipelineLayout(vk::Device device,vk::DescriptorSetLayout set_layout)
+vk::PipelineLayout MultiRender::createPipelineLayout(vk::Device device/*, vk::DescriptorSetLayout set_layout*/)
 {
 	vk::PipelineLayoutCreateInfo info;
-	info.setSetLayoutCount(1);
-	info.setSetLayouts(set_layout);
+	//info.setSetLayoutCount(1);
+	//info.setSetLayouts(set_layout);
 	return device.createPipelineLayout(info);
 }
 
@@ -1036,7 +1039,7 @@ RAII::MemRequiredInfo MultiRender::queryImageMemRequiredInfo(RAII::Device device
 	auto properties = device.physicalDevice.getMemoryProperties();
 	auto requirement = device.device.getImageMemoryRequirements(image);
 	info.size = requirement.size;
-
+	info.index = 0;
 	for (int i = 0; i < properties.memoryTypeCount; i++)
 	{
 		if ((requirement.memoryTypeBits & (1 << i)) &&
@@ -1234,7 +1237,8 @@ uint32_t MultiRender::commonPrepare()
 	// reset fence
 	iGPU_.device.resetFences(iGPU_.graphicPipeline.fence);
 	dGPU_.device.resetFences(dGPU_.graphicPipeline.fence);
-
+// TODO unlock
+/*
 	// acquire image index
 	auto result = iGPU_.device.acquireNextImageKHR(iGPU_.swapchain.swapchain,	// TODO update
 		std::numeric_limits<uint64_t>::max(),
@@ -1246,8 +1250,8 @@ uint32_t MultiRender::commonPrepare()
 	}
 
 	uint32_t igpu_index = result.value;
-
-	return igpu_index;
+*/
+	return 1;
 }
 
 void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
@@ -1255,12 +1259,10 @@ void MultiRender::renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index)
 	// Step1 render Image
 	// draw
 	dGPU_.graphicPipeline.commandBuffer.reset();
-	recordCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.offscreen.framebuffer);
+	recordOffscreenCommand(dGPU_, dGPU_.graphicPipeline.commandBuffer, dGPU_.offscreen.framebuffer);
 	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submit_info;
-	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer)
-		.setSignalSemaphores(dGPU_.graphicPipeline.presentAvaliableSemaphore)
-		.setWaitDstStageMask(flags);
+	submit_info.setCommandBuffers(dGPU_.graphicPipeline.commandBuffer);
 	dGPU_.graphicsQueue.submit(submit_info, dGPU_.graphicPipeline.fence);
 
 	// Step2 wait for fence

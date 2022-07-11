@@ -52,7 +52,7 @@ private:
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
 	
-	vk::PipelineLayout createPipelineLayout(vk::Device device,vk::DescriptorSetLayout set_layout);
+	vk::PipelineLayout createPipelineLayout(vk::Device device/*, vk::DescriptorSetLayout set_layout*/);
 	void createRenderDescriptor(RAII::Device device);
 
 	// Descriptor Buffer
