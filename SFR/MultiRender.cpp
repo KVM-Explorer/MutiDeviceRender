@@ -1161,15 +1161,15 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 {
 	// Step 2: Copy Image src host to dst host by mapping memory
-	//auto copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
-	//insertImageMemoryBarrier( copy_command, dst.mappingImage,
-	//	vk::AccessFlagBits::eNone,
-	//	vk::AccessFlagBits::eTransferWrite,
-	//	vk::ImageLayout::eUndefined,
-	//	vk::ImageLayout::eGeneral,
-	//	vk::PipelineStageFlagBits::eTransfer,
-	//	vk::PipelineStageFlagBits::eTransfer);
-	//endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool, dst.graphicsQueue);
+	auto copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
+	insertImageMemoryBarrier( copy_command, src.offscreen.image,
+		vk::AccessFlagBits::eNone,
+		vk::AccessFlagBits::eTransferRead,
+		vk::ImageLayout::eGeneral,
+		vk::ImageLayout::eGeneral,
+		vk::PipelineStageFlagBits::eTransfer,
+		vk::PipelineStageFlagBits::eTransfer);
+	endSingleCommand(src, copy_command, src.graphicPipeline.commandPool, src.graphicsQueue);
 
 	//vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor,0,0 };
 	//auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
@@ -1177,8 +1177,10 @@ void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 	auto requirements = queryImageMemRequiredInfo(src, src.offscreen.image,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-	void* src_data = src.device.mapMemory(src.offscreen.memory, 0, VK_WHOLE_SIZE);
+
 	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, VK_WHOLE_SIZE);
+	void* src_data = src.device.mapMemory(src.offscreen.memory, 0, VK_WHOLE_SIZE);
+	
 	memcpy(dst_data, src_data, requirements.size);
 	src.device.unmapMemory(src.offscreen.memory);
 	dst.device.unmapMemory(dst.mappingMemory);
