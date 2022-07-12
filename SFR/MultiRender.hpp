@@ -61,7 +61,7 @@ private:
 	vk::Buffer       createBuffer(RAII::Device device, vk::BufferUsageFlags flags);
 
 	// Descriptor Image
-	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlags flags);
+	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlags flags,  vk::ImageTiling tiling);
 	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);
 	vk::ImageView createImageView(vk::Device device, vk::Image image);
 	vk::Sampler createSampler(vk::Device device);
@@ -80,7 +80,7 @@ private:
 
 	//transfer Image between GPU
 	void copyPresentImage(RAII::Device &src, RAII::Device& dst, uint32_t src_index, uint32_t dst_index);
-	void copyPresentToMapping(RAII::Device& src, uint32_t src_index);
+	void copyOffscreenToMapping(RAII::Device& src, uint32_t src_index);
 	void copyMappingToMapping(RAII::Device& src, RAII::Device& device);
 	void copyMappingToPresent(RAII::Device& src, uint32_t src_index);
 	vk::ImageMemoryBarrier insertImageMemoryBarrier(vk::CommandBuffer command_buffer,

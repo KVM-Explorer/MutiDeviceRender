@@ -86,7 +86,7 @@ void MultiRender::init(GLFWwindow* window)
 
 	// Render Pass
 	iGPU_.renderPass = createRenderPass(iGPU_.device,vk::AttachmentLoadOp::eClear,vk::AttachmentStoreOp::eStore,
-		vk::ImageLayout::eUndefined,vk::ImageLayout::eGeneral);
+		vk::ImageLayout::eUndefined,vk::ImageLayout::eColorAttachmentOptimal);
 	//dGPU_.renderPass = createRenderPass(dGPU_.device,vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore, vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR);
 
 	// Frame Buffer TODO Only iGPU
@@ -223,6 +223,7 @@ void MultiRender::render()
 	auto igpu_index = commonPrepare();
 	renderByiGPU(igpu_index);
 	renderBydGPU();
+	copyOffscreenToMapping(dGPU_,0);
 	copyMappingToMapping(dGPU_, iGPU_);
 	updatePresentImage(igpu_index);
 	presentImage(igpu_index);
@@ -729,7 +730,7 @@ void MultiRender::initiGPUResource()
 		1
 	};
 	iGPU_.mappingImage = createImage(iGPU_.device, extent,
-		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc);
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc,vk::ImageTiling::eLinear);
 	iGPU_.mappingMemory = allocateImageMemory(iGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -753,7 +754,7 @@ void MultiRender::initdGPUResource()
 	dGPU_.offscreen.image = createImage(dGPU_.device, extent,
 		vk::Format::eB8G8R8A8Srgb,
 		vk::ImageUsageFlagBits::eTransferSrc|
-		vk::ImageUsageFlagBits::eColorAttachment);
+		vk::ImageUsageFlagBits::eColorAttachment,vk::ImageTiling::eOptimal);
 	// Memroy
 	dGPU_.offscreen.memory = allocateImageMemory(dGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
@@ -763,13 +764,20 @@ void MultiRender::initdGPUResource()
 	dGPU_.device.bindImageMemory(dGPU_.offscreen.image, dGPU_.offscreen.memory, 0);
 	// image view
 	dGPU_.offscreen.view = createImageView(dGPU_.device, dGPU_.offscreen.image);
-	// Sampler
-	dGPU_.offscreen.sampler = createSampler(dGPU_.device);
 	// Render Pass
 	dGPU_.renderPass = createRenderPass(dGPU_.device, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
-		vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral);
+		vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal);
 	// Frame Buffer
 	dGPU_.offscreen.framebuffer = createFrameBuffer(dGPU_.device, dGPU_.renderPass, dGPU_.offscreen.view);
+
+	// Mapping Image
+	dGPU_.mappingImage = createImage(dGPU_.device, extent,
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc, vk::ImageTiling::eLinear);
+	dGPU_.mappingMemory = allocateImageMemory(dGPU_,
+		vk::MemoryPropertyFlagBits::eHostVisible |
+		vk::MemoryPropertyFlagBits::eHostCoherent,
+		dGPU_.mappingImage);
+	dGPU_.device.bindImageMemory(dGPU_.mappingImage, dGPU_.mappingMemory, 0);
 /*
 	// Descriptor
 	dGPU_.offscreen.descriptor.imageLayout = vk::ImageLayout::eReadOnlyOptimal;
@@ -948,14 +956,14 @@ vk::Buffer MultiRender::createBuffer(RAII::Device device, vk::BufferUsageFlags f
 	return device.device.createBuffer(info);
 }
 
-vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::Format format, vk::ImageUsageFlags flags)
+vk::Image MultiRender::createImage(vk::Device device,vk::Extent3D extent , vk::Format format, vk::ImageUsageFlags flags,vk::ImageTiling tiling)
 {
 	vk::ImageCreateInfo info;
 
 	info.setFormat(format)
 		.setImageType(vk::ImageType::e2D)
 		.setSharingMode(vk::SharingMode::eExclusive)
-		.setTiling(vk::ImageTiling::eOptimal)
+		.setTiling(tiling)
 		.setExtent(extent)
 		.setArrayLayers(1)
 		.setInitialLayout(vk::ImageLayout::eUndefined)
@@ -1099,14 +1107,14 @@ void MultiRender::querySupportBlit(RAII::Device& device)
 void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, uint32_t src_index, uint32_t dt)
 {
 	vk::CommandBuffer copy_command;
-	copyPresentToMapping(src, src_index);
+	copyOffscreenToMapping(src, src_index);
 	copyMappingToMapping(src, dst);
 	copyMappingToPresent(src,src_index);
 	
 
 }
 
-void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
+void MultiRender::copyOffscreenToMapping(RAII::Device& src, uint32_t src_index)
 {
 	vk::CommandBuffer copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
@@ -1119,12 +1127,12 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier(		// present image
+	insertImageMemoryBarrier(		// offscren image
 		copy_command,
-		src.swapchain.images[src_index],
+		src.offscreen.image,
 		vk::AccessFlagBits::eMemoryRead,
 		vk::AccessFlagBits::eTransferRead,
-		vk::ImageLayout::ePresentSrcKHR,
+		vk::ImageLayout::eColorAttachmentOptimal,
 		vk::ImageLayout::eTransferSrcOptimal,
 		vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer);
 
@@ -1135,7 +1143,7 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 	image_copy_region.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setExtent({ swapchainRequiredInfo_.extent.width,swapchainRequiredInfo_.extent.height,1 });
-	copy_command.copyImage(src.swapchain.images[src_index],
+	copy_command.copyImage(src.offscreen.image,
 		vk::ImageLayout::eTransferSrcOptimal,
 		src.mappingImage,
 		vk::ImageLayout::eTransferDstOptimal,
@@ -1148,11 +1156,11 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 		vk::ImageLayout::eGeneral,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	insertImageMemoryBarrier( copy_command, src.swapchain.images[src_index],	// present image
+	insertImageMemoryBarrier( copy_command, src.offscreen.image,	// present image
 		vk::AccessFlagBits::eTransferRead,
 		vk::AccessFlagBits::eMemoryRead,
 		vk::ImageLayout::eTransferSrcOptimal,
-		vk::ImageLayout::ePresentSrcKHR,
+		vk::ImageLayout::eColorAttachmentOptimal,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
 	endSingleCommand(src, copy_command, src.graphicPipeline.commandPool, src.graphicsQueue);
@@ -1161,28 +1169,28 @@ void MultiRender::copyPresentToMapping(RAII::Device& src, uint32_t src_index)
 void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 {
 	// Step 2: Copy Image src host to dst host by mapping memory
-	auto copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
-	insertImageMemoryBarrier( copy_command, src.offscreen.image,
+	auto copy_command = startSingleCommand(dst, dst.graphicPipeline.commandPool);
+	insertImageMemoryBarrier( copy_command, dst.mappingImage,
 		vk::AccessFlagBits::eNone,
-		vk::AccessFlagBits::eTransferRead,
-		vk::ImageLayout::eGeneral,
+		vk::AccessFlagBits::eTransferWrite,
+		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::eGeneral,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
-	endSingleCommand(src, copy_command, src.graphicPipeline.commandPool, src.graphicsQueue);
+	endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool, dst.graphicsQueue);
 
 	//vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor,0,0 };
 	//auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
 
-	auto requirements = queryImageMemRequiredInfo(src, src.offscreen.image,
+	auto requirements = queryImageMemRequiredInfo(src, src.mappingImage,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
 
 	void* dst_data = dst.device.mapMemory(dst.mappingMemory, 0, VK_WHOLE_SIZE);
-	void* src_data = src.device.mapMemory(src.offscreen.memory, 0, VK_WHOLE_SIZE);
+	void* src_data = src.device.mapMemory(src.mappingMemory, 0, VK_WHOLE_SIZE);
 	
 	memcpy(dst_data, src_data, requirements.size);
-	src.device.unmapMemory(src.offscreen.memory);
+	src.device.unmapMemory(src.mappingMemory);
 	dst.device.unmapMemory(dst.mappingMemory);
 }
 
@@ -1356,7 +1364,7 @@ void MultiRender::updatePresentImage(uint32_t igpu_index)
 	insertImageMemoryBarrier(cmd, iGPU_.swapchain.images[igpu_index],
 		vk::AccessFlagBits::eNone,
 		vk::AccessFlagBits::eTransferWrite,
-		vk::ImageLayout::eGeneral,
+		vk::ImageLayout::eColorAttachmentOptimal,
 		vk::ImageLayout::eTransferDstOptimal,
 		vk::PipelineStageFlagBits::eTransfer,
 		vk::PipelineStageFlagBits::eTransfer);
@@ -1364,8 +1372,6 @@ void MultiRender::updatePresentImage(uint32_t igpu_index)
 	vk::ImageCopy copy_region;
 	copy_region.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
-		.setSrcOffset({400,0,1})
-		.setDstOffset({400,0,1})
 		.setExtent({ swapchainRequiredInfo_.extent.width / 2,swapchainRequiredInfo_.extent.height,1 });
 
 	cmd.copyImage(iGPU_.mappingImage, vk::ImageLayout::eTransferSrcOptimal,
