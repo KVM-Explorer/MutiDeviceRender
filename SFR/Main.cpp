@@ -32,9 +32,9 @@ int main() {
         frag = render.createShaderModule("shaders/Common.frag.spv", 1);
     	render.createCommonPipeline(vert, frag, 1);
 
-        //auto comp = Render::createShaderModule("shaders/RayTrace.comp.spv");
+        auto comp = render.createShaderModule("shaders/RayTrace.comp.spv",1);
 		
-        //Render::createComputerPipeline(comp);
+        render.createComputerPipeline(comp);
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();

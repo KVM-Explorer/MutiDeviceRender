@@ -142,6 +142,12 @@ void MultiRender::init(GLFWwindow* window)
 
 void MultiRender::release()
 {
+	// Computer Pipeline 
+	dGPU_.device.destroyFence(dGPU_.computerPipeline.fence);
+	dGPU_.device.freeCommandBuffers(dGPU_.computerPipeline.commandPool,dGPU_.computerPipeline.commandBuffer);
+	dGPU_.device.destroyCommandPool(dGPU_.computerPipeline.commandPool);
+	dGPU_.device.destroyPipeline(dGPU_.computerPipeline.pipeline);
+	dGPU_.device.destroyPipelineLayout(dGPU_.computerPipeline.pipelineLayout);
 	// Descriptor
 	dGPU_.device.freeDescriptorSets(dGPU_.texture.descriptorPool, dGPU_.texture.descriptorSet);
 	dGPU_.device.destroyDescriptorPool(dGPU_.texture.descriptorPool);
@@ -271,40 +277,26 @@ void MultiRender::createComputerPipeline(vk::ShaderModule computerShader)
 	shader_stage.setModule(computerShader)
 		.setStage(vk::ShaderStageFlagBits::eCompute)
 		.setPName("main");
+	// create computer pipeline 
+	vk::ComputePipelineCreateInfo info;
+	info.setLayout(dGPU_.computerPipeline.pipelineLayout)
+		.setStage(shader_stage);
 
-	
+	auto result = dGPU_.device.createComputePipeline(nullptr, info);
+	if (result.result != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed create computer pipeline");
+	}
+	dGPU_.computerPipeline.pipeline = result.value;
 
-	// set pipeline layout 
-	//computeQueue_ = device_.getQueue(queueIndices_.computerIndices.value(), 0);
-	//CHECK_NULL(computeQueue_)
-	//	descriptorSetLayout_ = createComputerDescriptorSetLayout();
-	//CHECK_NULL(descriptorSetLayout_)
+	dGPU_.computerPipeline.commandPool = createCommandPool(dGPU_.device,vk::CommandPoolCreateFlagBits::eResetCommandBuffer, dGPU_.queueIndices.computerIndices.value());
+	CHECK_NULL(dGPU_.computerPipeline.commandPool);
 
-	//	pipelineLayout_ = createComputerPipelineLayout();
-	//CHECK_NULL(pipelineLayout_)
+	dGPU_.computerPipeline.commandBuffer = createCommandBuffer(dGPU_.device,dGPU_.computerPipeline.commandPool);
+	CHECK_NULL(dGPU_.computerPipeline.commandBuffer);
 
-	//	descriptorSet_ = createComputerDescriptorSet();
-
-	//// fill with Shader
-	//vk::ComputePipelineCreateInfo info;
-	//info.setLayout(pipelineLayout_)
-	//	.setStage(shader_stage);
-
-	//auto result = device_.createComputePipeline(nullptr, info);
-	//if (result.result != vk::Result::eSuccess)
-	//{
-	//	throw std::runtime_error("failed create computer pipeline");
-	//}
-	//computerPipeline_ = result.value;
-
-	//computer_.commandPool = createCommandPool(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueIndices_.computerIndices.value());
-	//CHECK_NULL(computer_.commandPool)
-
-	//	computer_.commandBuffer = createCommandBuffer(computer_.commandPool);
-	//CHECK_NULL(computer_.commandBuffer)
-
-	//	computer_.fence = createFence();
-	//CHECK_NULL(computer_.fence)
+	dGPU_.computerPipeline.fence = createFence(dGPU_.device);
+	CHECK_NULL(dGPU_.computerPipeline.fence);
 }
 
 void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::ShaderModule frag_shader, int device_index)
@@ -646,7 +638,7 @@ vk::DescriptorSetLayout MultiRender::createDescriptorSetLayout(vk::Device device
 	vk::DescriptorSetLayoutCreateInfo info;
 
 	std::array<vk::DescriptorSetLayoutBinding, 1> layout_bindings = {
-		setLayoutBinding(vk::DescriptorType::eCombinedImageSampler,vk::ShaderStageFlagBits::eFragment,0)	// binding=0 image
+		setLayoutBinding(vk::DescriptorType::eStorageImage,vk::ShaderStageFlagBits::eCompute,0)	// binding=0 image
 	};
 
 	info.setPBindings(layout_bindings.data())
@@ -664,7 +656,7 @@ vk::DescriptorPool MultiRender::createDescriptorPool(vk::Device device)
 		return pool_size;
 	};
 	std::array<vk::DescriptorPoolSize, 1> pool_size{
-		createDescriptorSize(vk::DescriptorType::eCombinedImageSampler,1)
+		createDescriptorSize(vk::DescriptorType::eStorageImage,1)
 	};
 	vk::DescriptorPoolCreateInfo descriptor_pool_info;
 	// TODO update max sets 
@@ -687,7 +679,7 @@ std::vector<vk::DescriptorSet> MultiRender::createDescriptorSet(vk::Device devic
 	auto result = device.allocateDescriptorSets(info);
 
 	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
-		createWriteDescriptorSet(result[0],vk::DescriptorType::eCombinedImageSampler ,0,descriptor)
+		createWriteDescriptorSet(result[0],vk::DescriptorType::eStorageImage ,0,descriptor)
 	};
 
 	device.updateDescriptorSets(write_descriptorset.size(),
@@ -869,7 +861,8 @@ void MultiRender::initdGPUResource()
 	dGPU_.texture.descriptorSet = createDescriptorSet(dGPU_.device,dGPU_.texture.descriptorPool,dGPU_.texture.descriptorSetLayout,dGPU_.texture.descriptor);
 
 	// PipelineLayout
-	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, dGPU_.texture.descriptorSetLayout,true);
+	dGPU_.computerPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, dGPU_.texture.descriptorSetLayout,true);
+	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, {}, false);
 
 }
 
