@@ -97,7 +97,8 @@ private:
 	void recordPresentCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
 	void recordOffScreenCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
 	void prepareTexture();
-	void renderBydGPU(uint32_t igpu_index, uint32_t dgpu_index);
+	void renderBydGPU();
 	void renderByiGPU(uint32_t igpu_index);
 	void presentImage(uint32_t igpu_index);
+	void updatePresentImage(uint32_t igpu_index);
 };
