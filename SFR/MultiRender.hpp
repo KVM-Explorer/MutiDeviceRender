@@ -67,9 +67,12 @@ private:
 	vk::Sampler createSampler(vk::Device device);
 	vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,uint32_t binding, uint32_t descriptorCount = 1);
 	vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,uint32_t binding, vk::DescriptorImageInfo image_info);
-	vk::DescriptorSetLayout createDescriptorSetLayout(vk::Device device);
-	vk::DescriptorPool createDescriptorPool(vk::Device device);
-	std::vector<vk::DescriptorSet> createDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
+	vk::DescriptorSetLayout createComputerDescriptorSetLayout(vk::Device device);
+	vk::DescriptorPool createComputerDescriptorPool(vk::Device device);
+	std::vector<vk::DescriptorSet> createComputerDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
+	vk::DescriptorSetLayout createCommonDescriptorSetLayout(vk::Device device);
+	vk::DescriptorPool createCommonDescriptorPool(vk::Device device);
+	std::vector<vk::DescriptorSet> createCommonDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
 	void convertImageLayout(vk::CommandBuffer cmd, vk::Image image, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
 	void savePPMImage(const char* data,vk::Extent2D extent, vk::SubresourceLayout layout);
 	// Query
@@ -97,6 +100,7 @@ private:
 	uint32_t commonPrepare();
 	void recordPresentCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
 	void recordOffScreenCommand(RAII::Device device, vk::CommandBuffer buffer, vk::Framebuffer frame);
+	void recordRayTraceCommand(RAII::Device device, vk::CommandBuffer cmd);
 	void prepareTexture();
 	void renderBydGPU();
 	void renderByiGPU(uint32_t igpu_index);

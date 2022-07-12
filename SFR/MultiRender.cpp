@@ -234,6 +234,7 @@ void MultiRender::release()
 
 void MultiRender::render()
 {
+	prepareTexture();
 	auto igpu_index = commonPrepare();
 	renderByiGPU(igpu_index);
 	renderBydGPU();
@@ -633,7 +634,7 @@ vk::WriteDescriptorSet MultiRender::createWriteDescriptorSet(vk::DescriptorSet d
 	return info;
 }
 
-vk::DescriptorSetLayout MultiRender::createDescriptorSetLayout(vk::Device device)
+vk::DescriptorSetLayout MultiRender::createComputerDescriptorSetLayout(vk::Device device)
 {
 	vk::DescriptorSetLayoutCreateInfo info;
 
@@ -646,7 +647,7 @@ vk::DescriptorSetLayout MultiRender::createDescriptorSetLayout(vk::Device device
 	return device.createDescriptorSetLayout(info);
 }
 
-vk::DescriptorPool MultiRender::createDescriptorPool(vk::Device device)
+vk::DescriptorPool MultiRender::createComputerDescriptorPool(vk::Device device)
 {
 	auto createDescriptorSize = [](vk::DescriptorType type, uint32_t num)
 	{
@@ -668,7 +669,7 @@ vk::DescriptorPool MultiRender::createDescriptorPool(vk::Device device)
 	return device.createDescriptorPool(descriptor_pool_info);
 }
 
-std::vector<vk::DescriptorSet> MultiRender::createDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor)
+std::vector<vk::DescriptorSet> MultiRender::createComputerDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor)
 {
 	vk::DescriptorSetAllocateInfo info;
 	info.setDescriptorPool(descriptor_pool)
@@ -680,6 +681,60 @@ std::vector<vk::DescriptorSet> MultiRender::createDescriptorSet(vk::Device devic
 
 	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
 		createWriteDescriptorSet(result[0],vk::DescriptorType::eStorageImage ,0,descriptor)
+	};
+
+	device.updateDescriptorSets(write_descriptorset.size(),
+		write_descriptorset.data(), 0, nullptr);
+	return result;
+}
+
+vk::DescriptorSetLayout MultiRender::createCommonDescriptorSetLayout(vk::Device device)
+{
+	vk::DescriptorSetLayoutCreateInfo info;
+
+	std::array<vk::DescriptorSetLayoutBinding, 1> layout_bindings = {
+		setLayoutBinding(vk::DescriptorType::eCombinedImageSampler,vk::ShaderStageFlagBits::eFragment,0)	// binding=0 image
+	};
+
+	info.setPBindings(layout_bindings.data())
+		.setBindingCount(layout_bindings.size());
+	return device.createDescriptorSetLayout(info);
+}
+
+vk::DescriptorPool MultiRender::createCommonDescriptorPool(vk::Device device)
+{
+	auto createDescriptorSize = [](vk::DescriptorType type, uint32_t num)
+	{
+		vk::DescriptorPoolSize pool_size;
+		pool_size.setType(type)
+			.setDescriptorCount(num);
+		return pool_size;
+	};
+	std::array<vk::DescriptorPoolSize, 1> pool_size{
+		createDescriptorSize(vk::DescriptorType::eCombinedImageSampler,1)
+	};
+	vk::DescriptorPoolCreateInfo descriptor_pool_info;
+	// TODO update max sets 
+	descriptor_pool_info.setPoolSizeCount(pool_size.size())
+		.setPPoolSizes(pool_size.data())
+		.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+		.setMaxSets(3);
+
+	return device.createDescriptorPool(descriptor_pool_info);
+}
+
+std::vector<vk::DescriptorSet> MultiRender::createCommonDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor)
+{
+	vk::DescriptorSetAllocateInfo info;
+	info.setDescriptorPool(descriptor_pool)
+		.setSetLayouts(set_layout)
+		.setDescriptorSetCount(1);
+
+	// TODO Update
+	auto result = device.allocateDescriptorSets(info);
+
+	std::array<vk::WriteDescriptorSet, 1> write_descriptorset{
+		createWriteDescriptorSet(result[0],vk::DescriptorType::eCombinedImageSampler ,0,descriptor)
 	};
 
 	device.updateDescriptorSets(write_descriptorset.size(),
@@ -853,16 +908,25 @@ void MultiRender::initdGPUResource()
 	dGPU_.texture.descriptor.imageView = dGPU_.texture.view;
 	dGPU_.texture.descriptor.sampler = dGPU_.texture.sampler;
 
-	// DescriptorSetLayout
-	dGPU_.texture.descriptorSetLayout = createDescriptorSetLayout(dGPU_.device);
-	// DescriptorPool
-	dGPU_.texture.descriptorPool = createDescriptorPool(dGPU_.device);
-	// DescriptorSet
-	dGPU_.texture.descriptorSet = createDescriptorSet(dGPU_.device,dGPU_.texture.descriptorPool,dGPU_.texture.descriptorSetLayout,dGPU_.texture.descriptor);
+	
 
+	// DescriptorSetLayout
+	dGPU_.raytrace.descriptorSetLayout = createComputerDescriptorSetLayout(dGPU_.device);
+	// DescriptorPool
+	dGPU_.raytrace.descriptorPool = createComputerDescriptorPool(dGPU_.device);
+	// DescriptorSet
+	dGPU_.raytrace.descriptorSet = createComputerDescriptorSet(dGPU_.device, dGPU_.raytrace.descriptorPool, dGPU_.raytrace.descriptorSetLayout, dGPU_.texture.descriptor);
 	// PipelineLayout
-	dGPU_.computerPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, dGPU_.texture.descriptorSetLayout,true);
-	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, {}, false);
+	dGPU_.computerPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, dGPU_.raytrace.descriptorSetLayout,true);
+
+	// DescriptorSetLayout
+	dGPU_.texture.descriptorSetLayout = createCommonDescriptorSetLayout(dGPU_.device);
+	// DescriptorPool
+	dGPU_.texture.descriptorPool = createCommonDescriptorPool(dGPU_.device);
+	// DescriptorSet
+	dGPU_.texture.descriptorSet = createCommonDescriptorSet(dGPU_.device, dGPU_.texture.descriptorPool, dGPU_.texture.descriptorSetLayout, dGPU_.texture.descriptor);
+	// PipelineLayout
+	dGPU_.graphicPipeline.pipelineLayout = createPipelineLayout(dGPU_.device, dGPU_.texture.descriptorSetLayout, true);
 
 }
 
@@ -966,6 +1030,8 @@ void MultiRender::recordOffScreenCommand(RAII::Device device, vk::CommandBuffer 
 	buffer.beginRenderPass(render_pass_info,vk::SubpassContents::eInline);
 
 	buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,device.graphicPipeline.pipeline);
+	buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, device.graphicPipeline.pipelineLayout, 
+		0, 1,device.texture.descriptorSet.data(), 0,0);
 	vk::DeviceSize size = 0;
 	buffer.bindVertexBuffers(0, device.vertex.buffer,size);
 
@@ -975,6 +1041,43 @@ void MultiRender::recordOffScreenCommand(RAII::Device device, vk::CommandBuffer 
 
 	buffer.end();
 
+}
+
+void MultiRender::recordRayTraceCommand(RAII::Device device, vk::CommandBuffer cmd)
+{
+	vk::CommandBufferBeginInfo info;
+	info.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+	if (cmd.begin(&info) != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed record Ray Trace command");
+	}
+	// bind commmand cmd with pipeline
+	cmd.bindPipeline(vk::PipelineBindPoint::eCompute, device.computerPipeline.pipeline);
+	cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, device.computerPipeline.pipelineLayout,
+		0, device.raytrace.descriptorSet.size(), device.raytrace.descriptorSet.data(),
+		0, 0);
+	// TODO update 
+	cmd.dispatch(256 / 16, 256 / 16, 1);
+
+	cmd.end();
+}
+
+void MultiRender::prepareTexture()
+{
+	// Computer Shader computer
+	dGPU_.device.resetFences(dGPU_.computerPipeline.fence);
+
+	recordRayTraceCommand(dGPU_, dGPU_.computerPipeline.commandBuffer);
+	vk::SubmitInfo submit_info;
+	submit_info.setCommandBuffers(dGPU_.computerPipeline.commandBuffer)
+		.setCommandBufferCount(1);
+	dGPU_.computerQueue.submit(submit_info, dGPU_.computerPipeline.fence);
+
+	auto status = dGPU_.device.waitForFences(dGPU_.computerPipeline.fence, true, std::numeric_limits<uint64_t>::max());
+	if(status != vk::Result::eSuccess)
+	{
+		throw std::runtime_error("failed to wait computer Shader");
+	}
 }
 
 vk::PipelineLayout MultiRender::createPipelineLayout(vk::Device device, vk::DescriptorSetLayout set_layout,bool is_descriptor)

@@ -70,6 +70,7 @@ namespace RAII
 		vk::Framebuffer mappingFrameBuffer;
 		PresentImage offscreen;
 		Descriptor texture;
+		Descriptor raytrace;
 		bool isSupportsBlit{true};
 	};
 

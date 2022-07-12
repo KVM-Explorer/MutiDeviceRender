@@ -28,8 +28,8 @@ int main() {
         auto frag = render.createShaderModule("shaders/Common.frag.spv",0);
         render.createCommonPipeline(vert, frag, 0);
 
-        vert = render.createShaderModule("shaders/Common.vert.spv", 1);
-        frag = render.createShaderModule("shaders/Common.frag.spv", 1);
+        vert = render.createShaderModule("shaders/Texture.vert.spv", 1);
+        frag = render.createShaderModule("shaders/Texture.frag.spv", 1);
     	render.createCommonPipeline(vert, frag, 1);
 
         auto comp = render.createShaderModule("shaders/RayTrace.comp.spv",1);
