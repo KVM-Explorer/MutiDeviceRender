@@ -1063,7 +1063,7 @@ void MultiRender::recordRayTraceCommand(RAII::Device device, vk::CommandBuffer c
 		0, device.raytrace.descriptorSet.size(), device.raytrace.descriptorSet.data(),
 		0, 0);
 	// TODO update 
-	cmd.dispatch(256 / 16, 256 / 16, 1);
+	cmd.dispatch(1024 / 16, 512 / 16, 1);
 
 	cmd.end();
 }
@@ -1362,8 +1362,8 @@ void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 		vk::PipelineStageFlagBits::eTransfer);
 	endSingleCommand(dst, copy_command, dst.graphicPipeline.commandPool, dst.graphicsQueue);
 
-	//vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor,0,0 };
-	//auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
+	vk::ImageSubresource subresource{ vk::ImageAspectFlagBits::eColor,0,0 };
+	auto subresource_layout = src.device.getImageSubresourceLayout(src.mappingImage, subresource);
 
 	auto requirements = queryImageMemRequiredInfo(src, src.mappingImage,
 		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -1557,7 +1557,7 @@ void MultiRender::updatePresentImage(uint32_t igpu_index)
 	copy_region.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setSrcOffset({0,0,0})
-		.setDstOffset({400,0,0})
+		.setDstOffset({512,0,0})
 		.setExtent({ swapchainRequiredInfo_.extent.width/2,swapchainRequiredInfo_.extent.height,1 });
 
 	cmd.copyImage(iGPU_.mappingImage, vk::ImageLayout::eTransferSrcOptimal,

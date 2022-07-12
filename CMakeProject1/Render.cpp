@@ -1080,8 +1080,8 @@ void Render::createCommonPipeline(vk::ShaderModule vertex_shader, vk::ShaderModu
 		requiredInfo_.extent.width, 
 		requiredInfo_.extent.height,
 		0, 1);
-	vk::Rect2D scissor({ 200,0 }, 
-		{ requiredInfo_.extent.width - 200,requiredInfo_.extent.height });
+	vk::Rect2D scissor({ 0,0 }, 
+		{ requiredInfo_.extent.width ,requiredInfo_.extent.height });
 	viewport_state.setViewports(viewport)
 		.setScissors(scissor);
 	info.setPViewportState(&viewport_state);
