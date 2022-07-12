@@ -353,12 +353,12 @@ void MultiRender::createCommonPipeline(vk::ShaderModule vertex_shader, vk::Shade
 		info.setLayout(dGPU_.graphicPipeline.pipelineLayout);
 		// TODO viewport and scissor
 		vk::PipelineViewportStateCreateInfo viewport_state;
-		vk::Viewport viewport(400, 0,
-			swapchainRequiredInfo_.extent.width/2,
+		vk::Viewport viewport(0, 0,
+			swapchainRequiredInfo_.extent.width,
 			swapchainRequiredInfo_.extent.height,
 			0, 1);
 		vk::Rect2D scissor({ 0,0 },
-			{ swapchainRequiredInfo_.extent.width/2,
+			{ swapchainRequiredInfo_.extent.width,
 				swapchainRequiredInfo_.extent.height });
 		viewport_state.setViewports(viewport)
 			.setScissors(scissor);
@@ -431,7 +431,6 @@ void MultiRender::createPhysicalDevice()
 		auto dproperty = device.getProperties();
 		auto features = device.getFeatures();
 	}
-	// TODO ���ö��豸
 	iGPU_.physicalDevice = phycial_device[0];
 	std::cout << "iGPU: " << phycial_device[0].getProperties().deviceName << std::endl;
 	dGPU_.physicalDevice = phycial_device[1];
@@ -665,6 +664,28 @@ void MultiRender::convertImageLayout(vk::CommandBuffer cmd, vk::Image image, vk:
 
 	cmd.pipelineBarrier(stage_mask, stage_mask, vk::DependencyFlagBits::eByRegion,
 		0, nullptr, 0, nullptr, 1, &image_memory_barrier);
+}
+
+void MultiRender::savePPMImage(const char* data, vk::Extent2D extent,vk::SubresourceLayout layout)
+{
+	// Formt BGR
+	std::ofstream file("image.ppm", std::ios::out | std::ios::binary);
+
+	//header
+	file << "P6\n" << extent.width << "\n" << extent.height << "\n" << 255 << "\n";
+	for(uint32_t y = 0; y<extent.height;y++)
+	{
+		unsigned int* row = (unsigned int*)data;
+		for(uint32_t x=0;x<extent.width;x++)
+		{
+			file.write((char*)row + 2, 1);
+			file.write((char*)row + 1, 1);
+			file.write((char*)row, 1);
+			row++;
+		}
+		data += layout.rowPitch;
+	}
+	file.close();
 }
 
 vk::RenderPass MultiRender::createRenderPass(vk::Device device, vk::AttachmentLoadOp load_op, 
@@ -1190,6 +1211,7 @@ void MultiRender::copyMappingToMapping(RAII::Device& src, RAII::Device& dst)
 	void* src_data = src.device.mapMemory(src.mappingMemory, 0, VK_WHOLE_SIZE);
 	
 	memcpy(dst_data, src_data, requirements.size);
+	//savePPMImage((const char*)src_data, swapchainRequiredInfo_.extent, subresource_layout);
 	src.device.unmapMemory(src.mappingMemory);
 	dst.device.unmapMemory(dst.mappingMemory);
 }
@@ -1372,7 +1394,7 @@ void MultiRender::updatePresentImage(uint32_t igpu_index)
 	vk::ImageCopy copy_region;
 	copy_region.setSrcSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
 		.setDstSubresource({ vk::ImageAspectFlagBits::eColor,0,0,1 })
-		.setExtent({ swapchainRequiredInfo_.extent.width / 2,swapchainRequiredInfo_.extent.height,1 });
+		.setExtent({ swapchainRequiredInfo_.extent.width/2 ,swapchainRequiredInfo_.extent.height,1 });
 
 	cmd.copyImage(iGPU_.mappingImage, vk::ImageLayout::eTransferSrcOptimal,
 		iGPU_.swapchain.images[igpu_index], vk::ImageLayout::eTransferDstOptimal,

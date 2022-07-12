@@ -71,6 +71,7 @@ private:
 	vk::DescriptorPool createDescriptorPool(vk::Device device);
 	std::vector<vk::DescriptorSet> createDescriptorSet(vk::Device device, vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout set_layout, vk::DescriptorImageInfo descriptor);
 	void convertImageLayout(vk::CommandBuffer cmd, vk::Image image, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
+	void savePPMImage(const char* data,vk::Extent2D extent, vk::SubresourceLayout layout);
 	// Query
 	RAII::QueueFamilyIndices queryPhysicalDeviceQueue(vk::PhysicalDevice physical_device);
 	RAII::SwapChainRequiredInfo querySwapChainRequiredInfo(uint32_t w, uint32_t h);
