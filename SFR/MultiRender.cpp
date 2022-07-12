@@ -129,9 +129,9 @@ void MultiRender::init(GLFWwindow* window)
 	iGPU_.index = 0;
 	dGPU_.index = 1;
 
-
-	initdGPUResource();
 	initiGPUResource();
+	initdGPUResource();
+	
 
 	//// query support copy method
 	//std::cout << "iGPU" << "\t"<<std::endl;
@@ -729,7 +729,7 @@ void MultiRender::initiGPUResource()
 		1
 	};
 	iGPU_.mappingImage = createImage(iGPU_.device, extent,
-		vk::Format::eR8G8B8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc);
+		vk::Format::eB8G8R8A8Srgb, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc);
 	iGPU_.mappingMemory = allocateImageMemory(iGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
 		vk::MemoryPropertyFlagBits::eHostCoherent,
@@ -752,9 +752,8 @@ void MultiRender::initdGPUResource()
 	// Image
 	dGPU_.offscreen.image = createImage(dGPU_.device, extent,
 		vk::Format::eB8G8R8A8Srgb,
-		vk::ImageUsageFlagBits::eTransferSrc | 
-		vk::ImageUsageFlagBits::eColorAttachment |
-		vk::ImageUsageFlagBits::eSampled);
+		vk::ImageUsageFlagBits::eTransferSrc|
+		vk::ImageUsageFlagBits::eColorAttachment);
 	// Memroy
 	dGPU_.offscreen.memory = allocateImageMemory(dGPU_,
 		vk::MemoryPropertyFlagBits::eHostVisible |
@@ -1066,7 +1065,7 @@ RAII::MemRequiredInfo MultiRender::queryImageMemRequiredInfo(RAII::Device device
 	auto properties = device.physicalDevice.getMemoryProperties();
 	auto requirement = device.device.getImageMemoryRequirements(image);
 	info.size = requirement.size;
-	//info.index = 0;
+	info.index = 0;
 	for (int i = 0; i < properties.memoryTypeCount; i++)
 	{
 		if ((requirement.memoryTypeBits & (1 << i)) &&
