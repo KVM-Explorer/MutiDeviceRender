@@ -42,7 +42,13 @@ namespace RAII
 		std::vector<vk::Image>	images;
 		std::vector<vk::ImageView> imageViews;
 	};
-
+	struct PresentImage
+	{
+		vk::Image image;
+		vk::ImageView view;
+		vk::Framebuffer framebuffer;
+		vk::DeviceMemory memory;
+	};
 	struct Device
 	{
 		vk::Device device;
@@ -62,7 +68,8 @@ namespace RAII
 		vk::DeviceMemory mappingMemory;
 		vk::ImageView mappingImageView;
 		vk::Framebuffer mappingFrameBuffer;
-		Descriptor offscreen;
+		PresentImage offscreen;
+		Descriptor texture;
 		bool isSupportsBlit{true};
 	};
 

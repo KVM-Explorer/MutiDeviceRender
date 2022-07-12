@@ -52,7 +52,7 @@ private:
 	vk::Semaphore createSemaphore(vk::Device device);
 	vk::Fence createFence(vk::Device device);
 	
-	vk::PipelineLayout createPipelineLayout(vk::Device device/*, vk::DescriptorSetLayout set_layout*/);
+	vk::PipelineLayout createPipelineLayout(vk::Device device, vk::DescriptorSetLayout set_layout,bool is_descriptor);
 	void createRenderDescriptor(RAII::Device device);
 
 	// Descriptor Buffer
@@ -63,7 +63,7 @@ private:
 	// Descriptor Image
 	vk::Image createImage(vk::Device device, vk::Extent3D extent, vk::Format format, vk::ImageUsageFlags flags,  vk::ImageTiling tiling);
 	vk::DeviceMemory allocateImageMemory(RAII::Device& device, vk::MemoryPropertyFlags flags, vk::Image image);
-	vk::ImageView createImageView(vk::Device device, vk::Image image);
+	vk::ImageView createImageView(vk::Device device, vk::Image image, vk::Format format);
 	vk::Sampler createSampler(vk::Device device);
 	vk::DescriptorSetLayoutBinding setLayoutBinding(vk::DescriptorType type, vk::ShaderStageFlagBits flags,uint32_t binding, uint32_t descriptorCount = 1);
 	vk::WriteDescriptorSet createWriteDescriptorSet(vk::DescriptorSet descriptor_set, vk::DescriptorType type,uint32_t binding, vk::DescriptorImageInfo image_info);
