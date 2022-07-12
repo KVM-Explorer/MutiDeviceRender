@@ -142,12 +142,18 @@ void MultiRender::init(GLFWwindow* window)
 
 void MultiRender::release()
 {
+
+
 	// Computer Pipeline 
 	dGPU_.device.destroyFence(dGPU_.computerPipeline.fence);
 	dGPU_.device.freeCommandBuffers(dGPU_.computerPipeline.commandPool,dGPU_.computerPipeline.commandBuffer);
 	dGPU_.device.destroyCommandPool(dGPU_.computerPipeline.commandPool);
 	dGPU_.device.destroyPipeline(dGPU_.computerPipeline.pipeline);
 	dGPU_.device.destroyPipelineLayout(dGPU_.computerPipeline.pipelineLayout);
+	// Descriptor
+	dGPU_.device.freeDescriptorSets(dGPU_.raytrace.descriptorPool, dGPU_.raytrace.descriptorSet);
+	dGPU_.device.destroyDescriptorPool(dGPU_.raytrace.descriptorPool);
+	dGPU_.device.destroyDescriptorSetLayout(dGPU_.raytrace.descriptorSetLayout);
 	// Descriptor
 	dGPU_.device.freeDescriptorSets(dGPU_.texture.descriptorPool, dGPU_.texture.descriptorSet);
 	dGPU_.device.destroyDescriptorPool(dGPU_.texture.descriptorPool);
