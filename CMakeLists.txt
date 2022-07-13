@@ -6,5 +6,5 @@ cmake_minimum_required (VERSION 3.8)
 project ("CMakeProject1")
 
 # 包含子项目。
-add_subdirectory ("CMakeProject1")
+add_subdirectory ("RayTrace")
 add_subdirectory("SFR")

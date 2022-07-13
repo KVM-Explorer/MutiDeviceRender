@@ -7,7 +7,7 @@ const int imageWidth = 256;
 const int imageHeight = 256;
 const float INF = 0x7fffffff ;
 const float focalLength = 1.0f;
-const int maxDepth = 30;
+const int maxDepth = 50;
 const int maxObjectNum = 4;
 const int samplesNum = 100;
 
@@ -140,14 +140,14 @@ void initObjects()
     objects[1].radius = 100.f;
     objects[1].matrial = vec3(0.7,0.7,0.3);
 
-    // objects[2].center = vec3(-1,0,-1);
-    // objects[2].radius = 0.5f;
-    // objects[2].matrial = vec3(0.8,0.8,0.8);
+    objects[2].center = vec3(-1,0,-1);
+    objects[2].radius = 0.5f;
+    objects[2].matrial = vec3(0.8,0.8,0.8);
 
 
-    // objects[3].center = vec3(1,0,-1);
-    // objects[3].radius = 0.5f;
-    // objects[3].matrial = vec3(0.8,0.6,0.2);
+    objects[3].center = vec3(1,0,-1);
+    objects[3].radius = 0.5f;
+    objects[3].matrial = vec3(0.8,0.6,0.2);
 }
 
 Ray rayInit(vec3 pos,vec3 d)

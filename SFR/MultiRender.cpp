@@ -244,10 +244,11 @@ void MultiRender::render()
 	auto igpu_index = commonPrepare();
 	renderByiGPU(igpu_index);
 	renderBydGPU();
-	copyOffscreenToMapping(dGPU_,0);
+	copyOffscreenToMapping(dGPU_);
 	copyMappingToMapping(dGPU_, iGPU_);
 	updatePresentImage(igpu_index);
 	presentImage(igpu_index);
+	//frameFPS();
 }
 
 void MultiRender::waitIdle()
@@ -1290,14 +1291,14 @@ void MultiRender::querySupportBlit(RAII::Device& device)
 void MultiRender::copyPresentImage(RAII::Device& src, RAII::Device& dst, uint32_t src_index, uint32_t dt)
 {
 	vk::CommandBuffer copy_command;
-	copyOffscreenToMapping(src, src_index);
+	copyOffscreenToMapping(src);
 	copyMappingToMapping(src, dst);
 	copyMappingToPresent(src,src_index);
 	
 
 }
 
-void MultiRender::copyOffscreenToMapping(RAII::Device& src, uint32_t src_index)
+void MultiRender::copyOffscreenToMapping(RAII::Device& src)
 {
 	vk::CommandBuffer copy_command = startSingleCommand(src, src.graphicPipeline.commandPool);
 	// Add Image Memory Barrier
@@ -1581,6 +1582,19 @@ void MultiRender::updatePresentImage(uint32_t igpu_index)
 		vk::PipelineStageFlagBits::eTransfer);
 
 	endSingleCommand(iGPU_, cmd, iGPU_.graphicPipeline.commandPool, iGPU_.graphicsQueue);
+}
+
+void MultiRender::frameFPS()
+{
+	frameCount_++;
+	auto now = std::chrono::steady_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTimePoint_).count();
+	if(duration>1000)
+	{
+		std::cout << "FPS:" << frameCount_ << std::endl;
+		lastTimePoint_ = now;
+		frameCount_ = 0;
+	}
 }
 
 void MultiRender::endSingleCommand(RAII::Device& device, vk::CommandBuffer& command, vk::CommandPool pool, vk::Queue& queue)

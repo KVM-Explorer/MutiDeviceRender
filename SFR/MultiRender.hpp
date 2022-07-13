@@ -5,6 +5,7 @@
 #include "RAII.hpp"
 #include <fstream>
 #include <istream>
+#include <chrono>
 
 class MultiRender
 {
@@ -25,7 +26,8 @@ private:
 	RAII::Device iGPU_;
 	RAII::Device dGPU_;
 	RAII::SwapChainRequiredInfo swapchainRequiredInfo_;
-	
+	int frameCount_{};
+	std::chrono::steady_clock::time_point lastTimePoint_;
 	
 
 private:
@@ -84,7 +86,7 @@ private:
 
 	//transfer Image between GPU
 	void copyPresentImage(RAII::Device &src, RAII::Device& dst, uint32_t src_index, uint32_t dst_index);
-	void copyOffscreenToMapping(RAII::Device& src, uint32_t src_index);
+	void copyOffscreenToMapping(RAII::Device& src);
 	void copyMappingToMapping(RAII::Device& src, RAII::Device& device);
 	void copyMappingToPresent(RAII::Device& src, uint32_t src_index);
 	vk::ImageMemoryBarrier insertImageMemoryBarrier(vk::CommandBuffer command_buffer,
@@ -106,4 +108,7 @@ private:
 	void renderByiGPU(uint32_t igpu_index);
 	void presentImage(uint32_t igpu_index);
 	void updatePresentImage(uint32_t igpu_index);
+
+	// tool
+	void frameFPS();
 };
