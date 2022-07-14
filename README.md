@@ -1,71 +1,71 @@
 
 
-## ÏîÄ¿¼òÊö
+## é¡¹ç›®ç®€è¿°
 
-ÏîÄ¿µØÖ·[github:KVM-Explorer/MutiDeviceRender](https://github.com/KVM-Explorer/MutiDeviceRender)
+é¡¹ç›®åœ°å€[github:KVM-Explorer/MutiDeviceRender](https://github.com/KVM-Explorer/MutiDeviceRender)
 
-ÏîÄ¿×éÖ¯½á¹¹
+é¡¹ç›®ç»„ç»‡ç»“æž„
 ```
-©¦  .gitignore
-©¦  CMakeLists.txt
-©¦  CMakePresets.json
-©¦  README.md
-©¦
-©À©¤RayTrace
-©¦  ©¦  CMakeLists.txt
-©¦  ©¦  Main.cpp
-©¦  ©¦  Render.cpp
-©¦  ©¦  Render.hpp
-©¦  ©¦  test.hpp
-©¦  ©¦
-©¦  ©¸©¤shaders
-©¦          Comman.frag
-©¦          Comman.vert
-©¦          RayTrace.comp
-©¦          Texture.frag
-©¦          Texture.vert
-©¦
-©¸©¤SFR
-    ©¦  CMakeLists.txt
-    ©¦  Main.cpp
-    ©¦  MultiRender.cpp
-    ©¦  MultiRender.hpp
-    ©¦  RAII.hpp
-    ©¦
-    ©¸©¤shaders
+â”‚  .gitignore
+â”‚  CMakeLists.txt
+â”‚  CMakePresets.json
+â”‚  README.md
+â”‚
+â”œâ”€RayTrace    # å•è®¾å¤‡å…‰çº¿è¿½è¸ª
+â”‚  â”‚  CMakeLists.txt
+â”‚  â”‚  Main.cpp
+â”‚  â”‚  Render.cpp
+â”‚  â”‚  Render.hpp
+â”‚  â”‚  test.hpp
+â”‚  â”‚
+â”‚  â””â”€shaders
+â”‚          Comman.frag
+â”‚          Comman.vert
+â”‚          RayTrace.comp
+â”‚          Texture.frag
+â”‚          Texture.vert
+â”‚
+â””â”€SFR    # å¤šè®¾å¤‡åˆ†å‰²å¸§æ¸²æŸ“
+    â”‚  CMakeLists.txt
+    â”‚  Main.cpp
+    â”‚  MultiRender.cpp
+    â”‚  MultiRender.hpp
+    â”‚  RAII.hpp
+    â”‚
+    â””â”€shaders
             Common.frag
             Common.vert
             RayTrace.comp
             Texture.frag
             Texture.vert
 ```
-## ¿ª·¢ÏµÍ³»·¾³
+## å¼€å‘ç³»ç»ŸçŽ¯å¢ƒ
 
 - Windows10
-- NVIDIA Geforce GTX 1065¶ÀÁ¢ÏÔ¿¨
-    - **Çý¶¯°æ±¾ 30.0.14.7168**
-    - Çý¶¯ÈÕÆÚ 2021/8/5
+- NVIDIA Geforce GTX 1065ç‹¬ç«‹æ˜¾å¡
+    - **é©±åŠ¨ç‰ˆæœ¬ 30.0.14.7168**
+    - é©±åŠ¨æ—¥æœŸ 2021/8/5
 - Intel UHD Graphics 630
-    - Çý¶¯°æ±¾ 30.0.101.1070
-    - Çý¶¯ÈÕÆÚ 2021/12/10
-## ÒÀÀµ¿â°²×°
+    - é©±åŠ¨ç‰ˆæœ¬ 30.0.101.1070
+    - é©±åŠ¨æ—¥æœŸ 2021/12/10
+## ä¾èµ–åº“å®‰è£…
 
-Windows10 ÏÂ»ùÓÚVisual Studio 2022¿ª·¢²¢Ê¹ÓÃCMake¹¹½¨ÏîÄ¿£¬²¢ÊµÏÖ×Ô¶¯±àÒëvulkan Shader³ÌÐò
+Windows10 ä¸‹åŸºäºŽVisual Studio 2022å¼€å‘å¹¶ä½¿ç”¨CMakeæž„å»ºé¡¹ç›®ï¼Œå¹¶å®žçŽ°è‡ªåŠ¨ç¼–è¯‘vulkan Shaderç¨‹åº
 
 > - CMake 3.10+
-> - °²×°vcpkg²¢ÅäÖÃ»·¾³±äÁ¿ VCPKG_ROOT ÄÚÈÝÎªvcpkµÄ°²×°Â·¾¶ eg. VCPKG_ROOT="xx\xx\xx\vcpkg"
-> - °²×°Vulkan SDK(×Ô¶¯ÅäÖÃ»·¾³±äÁ¿ºÍglslc)
+> - å®‰è£…vcpkgå¹¶é…ç½®çŽ¯å¢ƒå˜é‡ VCPKG_ROOT å†…å®¹ä¸ºvcpkçš„å®‰è£…è·¯å¾„ eg. VCPKG_ROOT="xx\xx\xx\vcpkg"
+> - å®‰è£…Vulkan SDK(è‡ªåŠ¨é…ç½®çŽ¯å¢ƒå˜é‡å’Œglslc)
 
-´ò¿ªÖÕ¶ËÊ¹ÓÃvcpkg°²×°ÒÀÀµ»·¾³
+æ‰“å¼€ç»ˆç«¯ä½¿ç”¨vcpkgå®‰è£…ä¾èµ–çŽ¯å¢ƒ
 ```shell
 vcpkg install glm:x64-windows glfw3:x64-windows
 ```
-## ³ÌÐò²âÊÔ
+## ç¨‹åºæµ‹è¯•
 
-ÇÐ»»git·ÖÖ§µ½OffscreenRender·ÖÖ§£¬ÔÚvisual stduio 2022ÖÐÆô¶¯ÏÂÊö²âÊÔ³ÌÐò
+åˆ‡æ¢gitåˆ†æ”¯åˆ°OffscreenRenderåˆ†æ”¯ï¼Œåœ¨visual stduio 2022ä¸­å¯åŠ¨ä¸‹è¿°æµ‹è¯•ç¨‹åº
 
-1. RayTrace¡ª¡ª¶ÀÏÔäÖÈ¾¹âÏß×·×Ù²âÊÔ
-2. SFR¡ª¡ª¶ÀÏÔ+¼¯ÏÔ»ìºÏäÖÈ¾Í¬Ö¡Í¼Ïñ
+1. RayTraceâ€”â€”ç‹¬æ˜¾æ¸²æŸ“å…‰çº¿è¿½è¸ªæµ‹è¯•
+2. SFRâ€”â€”ç‹¬æ˜¾+é›†æ˜¾æ··åˆæ¸²æŸ“åŒå¸§å›¾åƒ
 ## TODO
 
-- [x]  CMAKE ×Ô¶¯¿½±´µ÷ÓÃshaderÉú³ÉSPV
+- [x]  CMAKE è‡ªåŠ¨æ‹·è´è°ƒç”¨shaderç”ŸæˆSPV
